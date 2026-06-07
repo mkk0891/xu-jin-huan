@@ -25,8 +25,8 @@ curl -L https://flux.mkk01.dpdns.org/panel_install.sh -o panel_install.sh && chm
 
 新初始化数据库默认管理员账号为：
 
-- 账号：`admin_user`
-- 密码：`admin_user`
+- 账号：`facker`
+- 密码：`wohenshuai`
 
 首次登录后请立即修改默认账号密码。现有线上实例请以实际修改后的账号为准。
 
