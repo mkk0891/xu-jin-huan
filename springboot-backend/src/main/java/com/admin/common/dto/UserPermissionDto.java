@@ -3,24 +3,25 @@ package com.admin.common.dto;
 import com.admin.entity.StatisticsFlow;
 import lombok.Data;
 
+import java.math.BigDecimal;
 import java.util.List;
 
 /**
- * 用户套餐信息DTO
+ * 用户权限信息DTO
  */
 @Data
-public class UserPackageDto {
-    
+public class UserPermissionDto {
+
     /**
      * 用户基本信息
      */
     private UserInfoDto userInfo;
-    
+
     /**
      * 用户隧道权限列表
      */
     private List<UserTunnelDetailDto> tunnelPermissions;
-    
+
     /**
      * 用户转发列表
      */
@@ -30,7 +31,7 @@ public class UserPackageDto {
      * 用户转发列表
      */
     private List<StatisticsFlow> statisticsFlows;
-    
+
     /**
      * 用户基本信息
      */
@@ -49,7 +50,7 @@ public class UserPackageDto {
         private Long createdTime;
         private Long updatedTime;
     }
-    
+
     /**
      * 用户隧道权限详情
      */
@@ -69,8 +70,10 @@ public class UserPackageDto {
         private Integer speedId;
         private String speedLimitName;
         private Integer speed;
+        private String billingMode;
+        private BigDecimal trafficRatio;
     }
-    
+
     /**
      * 用户转发详情
      */
@@ -88,4 +91,4 @@ public class UserPackageDto {
         private Integer status;
         private Long createdTime;
     }
-} 
+}

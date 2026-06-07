@@ -2,21 +2,21 @@ import { useState, useEffect } from 'react';
 import { Button } from "@heroui/button";
 import { Card, CardBody, CardHeader } from "@heroui/card";
 import { Input } from "@heroui/input";
-import { 
-  Table, 
-  TableHeader, 
-  TableColumn, 
-  TableBody, 
-  TableRow, 
-  TableCell 
+import {
+  Table,
+  TableHeader,
+  TableColumn,
+  TableBody,
+  TableRow,
+  TableCell
 } from "@heroui/table";
-import { 
-  Modal, 
-  ModalContent, 
-  ModalHeader, 
-  ModalBody, 
+import {
+  Modal,
+  ModalContent,
+  ModalHeader,
+  ModalBody,
   ModalFooter,
-  useDisclosure 
+  useDisclosure
 } from "@heroui/modal";
 import { Chip } from "@heroui/chip";
 import { Select, SelectItem } from "@heroui/select";
@@ -26,14 +26,17 @@ import { Spinner } from "@heroui/spinner";
 import { Progress } from "@heroui/progress";
 
 import toast from 'react-hot-toast';
-import { 
-  User, 
-  UserForm, 
-  UserTunnel, 
-  UserTunnelForm, 
-  Tunnel, 
-  SpeedLimit, 
-  Pagination as PaginationType 
+import {
+  BILLING_MODE_OPTIONS,
+  BillingMode,
+  User,
+  UserForm,
+  UserTunnel,
+  UserTunnelForm,
+  Tunnel,
+  SpeedLimit,
+  Pagination as PaginationType,
+  getBillingModeLabel
 } from '@/types';
 import {
   getAllUsers,
@@ -97,7 +100,7 @@ const calculateUserTotalUsedFlow = (user: User): number => {
 const calculateTunnelUsedFlow = (tunnel: UserTunnel): number => {
   const inFlow = tunnel.inFlow || 0;
   const outFlow = tunnel.outFlow || 0;
-  
+
   // 后端已按计费类型处理流量，前端直接使用入站+出站总和
   return inFlow + outFlow;
 };
@@ -131,8 +134,8 @@ export default function UserPage() {
   const { isOpen: isTunnelModalOpen, onOpen: onTunnelModalOpen, onClose: onTunnelModalClose } = useDisclosure();
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [userTunnels, setUserTunnels] = useState<UserTunnel[]>([]);
-  const [tunnelListLoading, setTunnelListLoading] = useState(false);  
-  
+  const [tunnelListLoading, setTunnelListLoading] = useState(false);
+
   // 分配新隧道权限相关状态
   const [tunnelForm, setTunnelForm] = useState<UserTunnelForm>({
     tunnelId: null,
@@ -140,7 +143,9 @@ export default function UserPage() {
     num: 10,
     expTime: null,
     flowResetTime: 0,
-    speedId: null
+    speedId: null,
+    billingMode: null,
+    trafficRatio: null
   });
   const [assignLoading, setAssignLoading] = useState(false);
 
@@ -187,7 +192,7 @@ export default function UserPage() {
         size: pagination.size,
         keyword: searchKeyword
       });
-      
+
       if (response.code === 0) {
         const data = response.data || {};
         setUsers(data || []);
@@ -316,7 +321,7 @@ export default function UserPage() {
       }
 
       const response = isEdit ? await updateUser(submitData) : await createUser(submitData);
-      
+
       if (response.code === 0) {
         toast.success(isEdit ? '更新成功' : '创建成功');
         onUserModalClose();
@@ -340,7 +345,9 @@ export default function UserPage() {
       num: 10,
       expTime: null,
       flowResetTime: 0,
-      speedId: null
+      speedId: null,
+      billingMode: null,
+      trafficRatio: null
     });
     onTunnelModalOpen();
     loadUserTunnels(user.id);
@@ -349,6 +356,11 @@ export default function UserPage() {
   const handleAssignTunnel = async () => {
     if (!tunnelForm.tunnelId || !tunnelForm.expTime || !currentUser) {
       toast.error('请填写完整信息');
+      return;
+    }
+
+    if (tunnelForm.trafficRatio !== null && (tunnelForm.trafficRatio <= 0 || tunnelForm.trafficRatio > 100)) {
+      toast.error('流量倍率必须大于0且不超过100');
       return;
     }
 
@@ -361,7 +373,9 @@ export default function UserPage() {
         num: tunnelForm.num,
         expTime: tunnelForm.expTime.getTime(),
         flowResetTime: tunnelForm.flowResetTime,
-        speedId: tunnelForm.speedId
+        speedId: tunnelForm.speedId,
+        billingMode: tunnelForm.billingMode,
+        trafficRatio: tunnelForm.trafficRatio
       });
 
       if (response.code === 0) {
@@ -372,7 +386,9 @@ export default function UserPage() {
           num: 10,
           expTime: null,
           flowResetTime: 0,
-          speedId: null
+          speedId: null,
+          billingMode: null,
+          trafficRatio: null
         });
         loadUserTunnels(currentUser.id);
       } else {
@@ -388,13 +404,20 @@ export default function UserPage() {
   const handleEditTunnel = (userTunnel: UserTunnel) => {
     setEditTunnelForm({
       ...userTunnel,
-      expTime: userTunnel.expTime
+      expTime: userTunnel.expTime,
+      billingMode: userTunnel.billingMode || null,
+      trafficRatio: userTunnel.trafficRatio ?? null
     });
     onEditTunnelModalOpen();
   };
 
   const handleUpdateTunnel = async () => {
     if (!editTunnelForm) return;
+
+    if (editTunnelForm.trafficRatio !== null && editTunnelForm.trafficRatio !== undefined && (editTunnelForm.trafficRatio <= 0 || editTunnelForm.trafficRatio > 100)) {
+      toast.error('流量倍率必须大于0且不超过100');
+      return;
+    }
 
     setEditTunnelLoading(true);
     try {
@@ -405,7 +428,9 @@ export default function UserPage() {
         expTime: editTunnelForm.expTime,
         flowResetTime: editTunnelForm.flowResetTime,
         speedId: editTunnelForm.speedId,
-        status: editTunnelForm.status
+        status: editTunnelForm.status,
+        billingMode: editTunnelForm.billingMode,
+        trafficRatio: editTunnelForm.trafficRatio
       });
 
       if (response.code === 0) {
@@ -460,11 +485,11 @@ export default function UserPage() {
 
     setResetFlowLoading(true);
     try {
-      const response = await resetUserFlow({ 
-        id: userToReset.id, 
+      const response = await resetUserFlow({
+        id: userToReset.id,
         type: 1 // 1表示重置用户流量
       });
-      
+
       if (response.code === 0) {
         toast.success('流量重置成功');
         onResetFlowModalClose();
@@ -491,11 +516,11 @@ export default function UserPage() {
 
     setResetTunnelFlowLoading(true);
     try {
-      const response = await resetUserFlow({ 
-        id: tunnelToReset.id, 
+      const response = await resetUserFlow({
+        id: tunnelToReset.id,
         type: 2 // 2表示重置隧道流量
       });
-      
+
       if (response.code === 0) {
         toast.success('隧道流量重置成功');
         onResetTunnelFlowModalClose();
@@ -527,13 +552,13 @@ export default function UserPage() {
   );
 
   return (
-    
+
       <div className="px-3 lg:px-6 py-8">
       {/* 页面头部 */}
       <div className="flex flex-col gap-4 mb-6">
         <div className="flex items-center gap-3">
         </div>
-        
+
         <div className="flex flex-col sm:flex-row gap-3 items-stretch sm:items-center justify-between">
           <div className="flex items-center gap-3 flex-1 max-w-md">
             <Input
@@ -559,12 +584,12 @@ export default function UserPage() {
               <SearchIcon className="w-4 h-4" />
             </Button>
           </div>
-          
+
           <Button
               variant="flat"
               color="primary"
               onPress={handleAdd}
-             
+
             >
               新增
             </Button>
@@ -600,10 +625,10 @@ export default function UserPage() {
             const expStatus = user.expTime ? getExpireStatus(user.expTime) : null;
             const usedFlow = calculateUserTotalUsedFlow(user);
             const flowPercent = user.flow > 0 ? Math.min((usedFlow / (user.flow * 1024 * 1024 * 1024)) * 100, 100) : 0;
-            
+
             return (
-              <Card 
-                key={user.id} 
+              <Card
+                key={user.id}
                 className="shadow-sm border border-divider hover:shadow-md transition-shadow duration-200"
               >
                 <CardHeader className="pb-2">
@@ -615,9 +640,9 @@ export default function UserPage() {
                       <p className="text-xs text-default-500 truncate">@{user.user}</p>
                     </div>
                     <div className="flex items-center gap-1.5 ml-2">
-                      <Chip 
-                        color={userStatus.color} 
-                        variant="flat" 
+                      <Chip
+                        color={userStatus.color}
+                        variant="flat"
                         size="sm"
                         className="text-xs"
                       >
@@ -639,8 +664,8 @@ export default function UserPage() {
                         <span className="text-default-600">已使用</span>
                         <span className="font-medium text-xs text-danger">{formatFlow(usedFlow)}</span>
                       </div>
-                      <Progress 
-                        size="sm" 
+                      <Progress
+                        size="sm"
                         value={flowPercent}
                         color={flowPercent > 90 ? 'danger' : flowPercent > 70 ? 'warning' : 'success'}
                         className="mt-1"
@@ -665,9 +690,9 @@ export default function UserPage() {
                             {expStatus && expStatus.color === 'success' ? (
                               <div className="text-xs">{formatDate(user.expTime)}</div>
                             ) : (
-                              <Chip 
-                                color={expStatus?.color || 'default'} 
-                                variant="flat" 
+                              <Chip
+                                color={expStatus?.color || 'default'}
+                                variant="flat"
                                 size="sm"
                                 className="text-xs"
                               >
@@ -679,7 +704,7 @@ export default function UserPage() {
                       )}
                     </div>
                   </div>
-                  
+
                   <div className="space-y-1.5 mt-3">
                     {/* 第一行：编辑和重置 */}
                     <div className="flex gap-1.5">
@@ -708,8 +733,8 @@ export default function UserPage() {
                         重置
                       </Button>
                     </div>
-                    
-                    {/* 第二行：权限和删除 */}
+
+                    {/* 第二行：权限 */}
                     <div className="flex gap-1.5">
                       <Button
                         size="sm"
@@ -721,6 +746,10 @@ export default function UserPage() {
                       >
                         权限
                       </Button>
+                    </div>
+
+                    {/* 第三行：删除 */}
+                    <div className="flex gap-1.5">
                       <Button
                         size="sm"
                         variant="flat"
@@ -829,7 +858,7 @@ export default function UserPage() {
                 className="cursor-pointer"
               />
             </div>
-            
+
             <RadioGroup
               label="状态"
               value={userForm.status.toString()}
@@ -893,7 +922,7 @@ export default function UserPage() {
                         </SelectItem>
                       ))}
                     </Select>
-                    
+
                     <Select
                       label="限速规则"
                       selectedKeys={tunnelForm.speedId ? [tunnelForm.speedId.toString()] : ["null"]}
@@ -912,7 +941,39 @@ export default function UserPage() {
                         ))
                       ]}
                     </Select>
-                    
+
+                    <Select
+                      label="计费模型"
+                      selectedKeys={tunnelForm.billingMode ? [tunnelForm.billingMode] : ["inherit"]}
+                      onSelectionChange={(keys) => {
+                        const value = Array.from(keys)[0] as string;
+                        setTunnelForm(prev => ({ ...prev, billingMode: value === "inherit" ? null : value as BillingMode }));
+                      }}
+                    >
+                      {[
+                        <SelectItem key="inherit" textValue="继承隧道配置">继承隧道配置</SelectItem>,
+                        ...BILLING_MODE_OPTIONS.map(option => (
+                          <SelectItem key={option.value} textValue={option.label}>
+                            {option.label}
+                          </SelectItem>
+                        ))
+                      ]}
+                    </Select>
+
+                    <Input
+                      label="流量倍率覆盖"
+                      type="number"
+                      value={tunnelForm.trafficRatio === null ? "" : tunnelForm.trafficRatio.toString()}
+                      onChange={(e) => {
+                        const rawValue = e.target.value;
+                        setTunnelForm(prev => ({ ...prev, trafficRatio: rawValue === "" ? null : Number(rawValue) || 0 }));
+                      }}
+                      placeholder="留空继承隧道倍率"
+                      min="0.01"
+                      max="100"
+                      step="0.1"
+                    />
+
                     <Input
                       label="流量限制(GB)"
                       type="number"
@@ -924,7 +985,7 @@ export default function UserPage() {
                       min="1"
                       max="99999"
                     />
-                    
+
                     <Input
                       label="转发数量"
                       type="number"
@@ -936,7 +997,7 @@ export default function UserPage() {
                       min="1"
                       max="99999"
                     />
-                    
+
                     <Select
                       label="流量重置日期"
                       selectedKeys={[tunnelForm.flowResetTime.toString()]}
@@ -956,7 +1017,7 @@ export default function UserPage() {
                       ))}
                       </>
                     </Select>
-                    
+
                     <DatePicker
                       label="到期时间"
                       value={tunnelForm.expTime ? parseDate(tunnelForm.expTime.toISOString().split('T')[0]) as any : null}
@@ -972,7 +1033,7 @@ export default function UserPage() {
                       className="cursor-pointer"
                     />
                   </div>
-                  
+
                   <Button
                     color="primary"
                     onPress={handleAssignTunnel}
@@ -999,6 +1060,7 @@ export default function UserPage() {
                     <TableColumn>转发数量</TableColumn>
                     <TableColumn>状态</TableColumn>
                     <TableColumn>限速规则</TableColumn>
+                    <TableColumn>计费模型</TableColumn>
                     <TableColumn>重置时间</TableColumn>
                     <TableColumn>到期时间</TableColumn>
                     <TableColumn>操作</TableColumn>
@@ -1044,6 +1106,14 @@ export default function UserPage() {
                           >
                             {userTunnel.speedLimitName || '不限速'}
                           </Chip>
+                        </TableCell>
+                        <TableCell>
+                          <div className="flex flex-col gap-1 text-small">
+                            <span className="font-medium">{getBillingModeLabel(userTunnel.billingMode)}</span>
+                            <span className="text-default-500">
+                              {userTunnel.trafficRatio ? `${userTunnel.trafficRatio}x` : '继承倍率'}
+                            </span>
+                          </div>
                         </TableCell>
                         <TableCell>{userTunnel.flowResetTime === 0 ? '不重置' : `每月${userTunnel.flowResetTime}号`}</TableCell>
                         <TableCell>{formatDate(userTunnel.expTime)}</TableCell>
@@ -1125,7 +1195,7 @@ export default function UserPage() {
                     min="1"
                     max="99999"
                   />
-                  
+
                   <Input
                     label="转发数量"
                     type="number"
@@ -1137,7 +1207,7 @@ export default function UserPage() {
                     min="1"
                     max="99999"
                   />
-                  
+
                   <Select
                     label="限速规则"
                     selectedKeys={editTunnelForm.speedId ? [editTunnelForm.speedId.toString()] : ['null']}
@@ -1155,7 +1225,39 @@ export default function UserPage() {
                       ))
                     ]}
                   </Select>
-                  
+
+                  <Select
+                    label="计费模型"
+                    selectedKeys={editTunnelForm.billingMode ? [editTunnelForm.billingMode] : ['inherit']}
+                    onSelectionChange={(keys) => {
+                      const value = Array.from(keys)[0] as string;
+                      setEditTunnelForm(prev => prev ? { ...prev, billingMode: value === 'inherit' ? null : value as BillingMode } : null);
+                    }}
+                  >
+                    {[
+                      <SelectItem key="inherit" textValue="继承隧道配置">继承隧道配置</SelectItem>,
+                      ...BILLING_MODE_OPTIONS.map(option => (
+                        <SelectItem key={option.value} textValue={option.label}>
+                          {option.label}
+                        </SelectItem>
+                      ))
+                    ]}
+                  </Select>
+
+                  <Input
+                    label="流量倍率覆盖"
+                    type="number"
+                    value={editTunnelForm.trafficRatio === null || editTunnelForm.trafficRatio === undefined ? "" : editTunnelForm.trafficRatio.toString()}
+                    onChange={(e) => {
+                      const rawValue = e.target.value;
+                      setEditTunnelForm(prev => prev ? { ...prev, trafficRatio: rawValue === "" ? null : Number(rawValue) || 0 } : null);
+                    }}
+                    placeholder="留空继承隧道倍率"
+                    min="0.01"
+                    max="100"
+                    step="0.1"
+                  />
+
                   <Select
                     label="流量重置日期"
                     selectedKeys={[editTunnelForm.flowResetTime.toString()]}
@@ -1175,7 +1277,7 @@ export default function UserPage() {
                     ))}
                     </>
                   </Select>
-                  
+
                   <DatePicker
                     label="到期时间"
                     value={editTunnelForm.expTime ? parseDate(new Date(editTunnelForm.expTime).toISOString().split('T')[0]) as any : null}
@@ -1192,7 +1294,7 @@ export default function UserPage() {
                     isRequired
                   />
                 </div>
-                
+
                 <RadioGroup
                   label="状态"
                   value={editTunnelForm.status.toString()}
@@ -1249,14 +1351,14 @@ export default function UserPage() {
             </div>
           </ModalBody>
           <ModalFooter>
-            <Button 
-              variant="light" 
+            <Button
+              variant="light"
               onPress={onDeleteModalClose}
             >
               取消
             </Button>
-            <Button 
-              color="danger" 
+            <Button
+              color="danger"
               onPress={handleConfirmDelete}
             >
               确认删除
@@ -1294,14 +1396,14 @@ export default function UserPage() {
             </div>
           </ModalBody>
           <ModalFooter>
-            <Button 
-              variant="light" 
+            <Button
+              variant="light"
               onPress={onDeleteTunnelModalClose}
             >
               取消
             </Button>
-            <Button 
-              color="danger" 
+            <Button
+              color="danger"
               onPress={handleConfirmRemoveTunnel}
             >
               确认删除
@@ -1362,14 +1464,14 @@ export default function UserPage() {
             </div>
           </ModalBody>
           <ModalFooter>
-            <Button 
-              variant="light" 
+            <Button
+              variant="light"
               onPress={onResetFlowModalClose}
             >
               取消
             </Button>
-            <Button 
-              color="warning" 
+            <Button
+              color="warning"
               onPress={handleConfirmResetFlow}
               isLoading={resetFlowLoading}
             >
@@ -1431,14 +1533,14 @@ export default function UserPage() {
             </div>
           </ModalBody>
           <ModalFooter>
-            <Button 
-              variant="light" 
+            <Button
+              variant="light"
               onPress={onResetTunnelFlowModalClose}
             >
               取消
             </Button>
-            <Button 
-              color="warning" 
+            <Button
+              color="warning"
               onPress={handleConfirmResetTunnelFlow}
               isLoading={resetTunnelFlowLoading}
             >
@@ -1448,6 +1550,6 @@ export default function UserPage() {
         </ModalContent>
       </Modal>
       </div>
-    
+
   );
-} 
+}

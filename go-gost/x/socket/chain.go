@@ -73,6 +73,23 @@ func updateChain(req updateChainRequest) error {
 	return nil
 }
 
+func upsertChain(req updateChainRequest) error {
+	name := strings.TrimSpace(req.Chain)
+	if name == "" {
+		name = strings.TrimSpace(req.Data.Name)
+	}
+	if name == "" {
+		return errors.New("chain name is required")
+	}
+
+	req.Chain = name
+	req.Data.Name = name
+	if registry.ChainRegistry().IsRegistered(name) {
+		return updateChain(req)
+	}
+	return createChain(createChainRequest{Data: req.Data})
+}
+
 func deleteChain(req deleteChainRequest) error {
 
 	name := strings.TrimSpace(req.Chain)

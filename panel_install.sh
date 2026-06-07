@@ -143,12 +143,12 @@ configure_docker_ipv6() {
 # 显示菜单
 show_menu() {
   echo "==============================================="
-  echo "          面板管理脚本"
+  echo "          须尽欢管理脚本"
   echo "==============================================="
   echo "请选择操作："
-  echo "1. 安装面板"
-  echo "2. 更新面板"
-  echo "3. 卸载面板"
+  echo "1. 安装须尽欢"
+  echo "2. 更新须尽欢"
+  echo "3. 卸载须尽欢"
   echo "4. 导出备份"
   echo "5. 退出"
   echo "==============================================="
@@ -178,8 +178,8 @@ get_config_params() {
   read -p "前端端口（默认 6366）: " FRONTEND_PORT
   FRONTEND_PORT=${FRONTEND_PORT:-6366}
 
-  read -p "后端端口（默认 6365）: " BACKEND_PORT
-  BACKEND_PORT=${BACKEND_PORT:-6365}
+  read -p "后端端口（默认 6666）: " BACKEND_PORT
+  BACKEND_PORT=${BACKEND_PORT:-6666}
 
   DB_NAME=$(generate_random)
   DB_USER=$(generate_random)
@@ -189,7 +189,7 @@ get_config_params() {
 
 # 安装功能
 install_panel() {
-  echo "🚀 开始安装面板..."
+  echo "🚀 开始安装须尽欢..."
   check_docker
   get_config_params
 
@@ -237,7 +237,7 @@ EOF
 
 # 更新功能
 update_panel() {
-  echo "🔄 开始更新面板..."
+  echo "🔄 开始更新须尽欢..."
   check_docker
 
   echo "🔽 下载最新配置文件..."
@@ -728,8 +728,45 @@ SET @sql = (
         AND table_name = 'tunnel'
         AND column_name = 'traffic_ratio'
     ),
-    'ALTER TABLE \`tunnel\` ADD COLUMN \`traffic_ratio\` DECIMAL(5,1) DEFAULT 1.0 COMMENT "流量倍率";',
+    'ALTER TABLE \`tunnel\` ADD COLUMN \`traffic_ratio\` DECIMAL(10,2) DEFAULT 1.00 COMMENT "流量倍率";',
     'SELECT "Column \`traffic_ratio\` already exists in \`tunnel\`";'
+  )
+);
+PREPARE stmt FROM @sql;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
+
+-- traffic_ratio 类型精度升级
+SET @sql = (
+  SELECT IF(
+    EXISTS (
+      SELECT 1
+      FROM information_schema.COLUMNS
+      WHERE table_schema = DATABASE()
+        AND table_name = 'tunnel'
+        AND column_name = 'traffic_ratio'
+        AND (numeric_precision < 10 OR numeric_scale < 2)
+    ),
+    'ALTER TABLE \`tunnel\` MODIFY COLUMN \`traffic_ratio\` DECIMAL(10,2) NOT NULL DEFAULT 1.00 COMMENT "流量倍率";',
+    'SELECT "Column \`traffic_ratio\` precision already ok in \`tunnel\`";'
+  )
+);
+PREPARE stmt FROM @sql;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
+
+-- billing_mode (计费模型)
+SET @sql = (
+  SELECT IF(
+    NOT EXISTS (
+      SELECT 1
+      FROM information_schema.COLUMNS
+      WHERE table_schema = DATABASE()
+        AND table_name = 'tunnel'
+        AND column_name = 'billing_mode'
+    ),
+    'ALTER TABLE \`tunnel\` ADD COLUMN \`billing_mode\` VARCHAR(32) NOT NULL DEFAULT "LEGACY" COMMENT "计费模型";',
+    'SELECT "Column \`billing_mode\` already exists in \`tunnel\`";'
   )
 );
 PREPARE stmt FROM @sql;
@@ -738,8 +775,65 @@ DEALLOCATE PREPARE stmt;
 
 -- 为现有数据设置默认流量倍率
 UPDATE \`tunnel\`
-SET \`traffic_ratio\` = 1.0
+SET \`traffic_ratio\` = 1.00
 WHERE \`traffic_ratio\` IS NULL;
+
+UPDATE \`tunnel\`
+SET \`billing_mode\` = 'LEGACY'
+WHERE \`billing_mode\` IS NULL OR \`billing_mode\` = '';
+
+-- user_tunnel 表：添加计费覆盖字段（如果不存在）
+SET @sql = (
+  SELECT IF(
+    NOT EXISTS (
+      SELECT 1
+      FROM information_schema.COLUMNS
+      WHERE table_schema = DATABASE()
+        AND table_name = 'user_tunnel'
+        AND column_name = 'billing_mode'
+    ),
+    'ALTER TABLE \`user_tunnel\` ADD COLUMN \`billing_mode\` VARCHAR(32) DEFAULT NULL COMMENT "计费模型覆盖";',
+    'SELECT "Column \`billing_mode\` already exists in \`user_tunnel\`";'
+  )
+);
+PREPARE stmt FROM @sql;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
+
+SET @sql = (
+  SELECT IF(
+    NOT EXISTS (
+      SELECT 1
+      FROM information_schema.COLUMNS
+      WHERE table_schema = DATABASE()
+        AND table_name = 'user_tunnel'
+        AND column_name = 'traffic_ratio'
+    ),
+    'ALTER TABLE \`user_tunnel\` ADD COLUMN \`traffic_ratio\` DECIMAL(10,2) DEFAULT NULL COMMENT "流量倍率覆盖";',
+    'SELECT "Column \`traffic_ratio\` already exists in \`user_tunnel\`";'
+  )
+);
+PREPARE stmt FROM @sql;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
+
+SET @sql = (
+  SELECT IF(
+    EXISTS (
+      SELECT 1
+      FROM information_schema.COLUMNS
+      WHERE table_schema = DATABASE()
+        AND table_name = 'user_tunnel'
+        AND column_name = 'traffic_ratio'
+        AND (numeric_precision < 10 OR numeric_scale < 2)
+    ),
+    'ALTER TABLE \`user_tunnel\` MODIFY COLUMN \`traffic_ratio\` DECIMAL(10,2) DEFAULT NULL COMMENT "流量倍率覆盖";',
+    'SELECT "Column \`traffic_ratio\` precision already ok in \`user_tunnel\`";'
+  )
+);
+PREPARE stmt FROM @sql;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
 
 -- forward 表：删除 proxy_protocol 字段（如果存在）
 SET @sql = (
@@ -904,6 +998,54 @@ UPDATE \`statistics_flow\`
 SET \`created_time\` = UNIX_TIMESTAMP() * 1000
 WHERE \`created_time\` = 0 OR \`created_time\` IS NULL;
 
+-- 创建 flow_ledger 表（如果不存在）
+CREATE TABLE IF NOT EXISTS \`flow_ledger\` (
+  \`id\` bigint(20) NOT NULL AUTO_INCREMENT,
+  \`node_id\` bigint(20) DEFAULT NULL,
+  \`forward_id\` bigint(20) DEFAULT NULL,
+  \`user_id\` int(10) DEFAULT NULL,
+  \`tunnel_id\` int(10) DEFAULT NULL,
+  \`user_tunnel_id\` int(10) DEFAULT NULL,
+  \`raw_in_flow\` bigint(20) NOT NULL DEFAULT 0,
+  \`raw_out_flow\` bigint(20) NOT NULL DEFAULT 0,
+  \`billed_in_flow\` bigint(20) NOT NULL DEFAULT 0,
+  \`billed_out_flow\` bigint(20) NOT NULL DEFAULT 0,
+  \`billing_mode\` varchar(32) NOT NULL DEFAULT 'LEGACY',
+  \`traffic_ratio\` decimal(10,2) NOT NULL DEFAULT 1.00,
+  \`service_name\` varchar(128) DEFAULT NULL,
+  \`created_time\` bigint(20) NOT NULL,
+  PRIMARY KEY (\`id\`),
+  KEY \`idx_flow_ledger_user_time\` (\`user_id\`,\`created_time\`),
+  KEY \`idx_flow_ledger_forward_time\` (\`forward_id\`,\`created_time\`),
+  KEY \`idx_flow_ledger_tunnel_time\` (\`tunnel_id\`,\`created_time\`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- 创建 flow_settlement 表（如果不存在）
+CREATE TABLE IF NOT EXISTS \`flow_settlement\` (
+  \`id\` bigint(20) NOT NULL AUTO_INCREMENT,
+  \`scope\` varchar(32) NOT NULL,
+  \`target_id\` bigint(20) NOT NULL,
+  \`user_id\` bigint(20) DEFAULT NULL,
+  \`user_name\` varchar(100) DEFAULT NULL,
+  \`tunnel_id\` int(10) DEFAULT NULL,
+  \`tunnel_name\` varchar(100) DEFAULT NULL,
+  \`user_tunnel_id\` int(10) DEFAULT NULL,
+  \`trigger_type\` varchar(32) NOT NULL,
+  \`in_flow\` bigint(20) NOT NULL DEFAULT 0,
+  \`out_flow\` bigint(20) NOT NULL DEFAULT 0,
+  \`total_flow\` bigint(20) NOT NULL DEFAULT 0,
+  \`flow_limit\` bigint(20) DEFAULT NULL,
+  \`forward_limit\` int(10) DEFAULT NULL,
+  \`reset_day\` bigint(20) DEFAULT NULL,
+  \`period_key\` varchar(16) NOT NULL,
+  \`settled_time\` bigint(20) NOT NULL,
+  \`created_time\` bigint(20) NOT NULL,
+  PRIMARY KEY (\`id\`),
+  KEY \`idx_flow_settlement_scope_time\` (\`scope\`,\`settled_time\`),
+  KEY \`idx_flow_settlement_user_time\` (\`user_id\`,\`settled_time\`),
+  KEY \`idx_flow_settlement_tunnel_time\` (\`tunnel_id\`,\`settled_time\`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
 EOF
 
   # 检查数据库容器
@@ -1048,7 +1190,7 @@ export_migration_sql() {
 
 # 卸载功能
 uninstall_panel() {
-  echo "🗑️ 开始卸载面板..."
+  echo "🗑️ 开始卸载须尽欢..."
   check_docker
 
   if [[ ! -f "docker-compose.yml" ]]; then
@@ -1059,7 +1201,7 @@ uninstall_panel() {
     echo "✅ docker-compose.yml 下载完成"
   fi
 
-  read -p "确认卸载面板吗？此操作将停止并删除所有容器和数据 (y/N): " confirm
+  read -p "确认卸载须尽欢吗？此操作将停止并删除所有容器和数据 (y/N): " confirm
   if [[ "$confirm" != "y" && "$confirm" != "Y" ]]; then
     echo "❌ 取消卸载"
     return 0

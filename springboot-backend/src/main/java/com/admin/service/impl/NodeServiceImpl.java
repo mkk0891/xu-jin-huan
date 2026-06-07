@@ -79,6 +79,9 @@ public class NodeServiceImpl extends ServiceImpl<NodeMapper, Node> implements No
     @Resource
     ViteConfigService viteConfigService;
 
+    @Value("${node.install-script-url:https://flux.mkk01.dpdns.org/install.sh}")
+    private String nodeInstallScriptUrl;
+
 
     // ========== 公共接口实现 ==========
 
@@ -362,8 +365,10 @@ public class NodeServiceImpl extends ServiceImpl<NodeMapper, Node> implements No
 
         StringBuilder command = new StringBuilder();
         
-        // 第一部分：下载安装脚本  
-        command.append("curl -L https://github.com/bqlpfy/flux-panel/releases/download/1.4.3/install.sh")
+        String installScriptUrl = StrUtil.blankToDefault(nodeInstallScriptUrl, "https://flux.mkk01.dpdns.org/install.sh").trim();
+
+        // 第一部分：下载安装脚本
+        command.append("curl -L ").append(installScriptUrl)
                .append(" -o ./install.sh && chmod +x ./install.sh && ");
         
         // 处理服务器地址，如果是IPv6需要添加方括号

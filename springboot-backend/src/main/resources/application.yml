@@ -47,3 +47,12 @@ captcha:
   secondary:
     enabled: true
     expire: 120000
+
+flow:
+  retention:
+    ledger-days: ${FLOW_LEDGER_RETENTION_DAYS:3}
+    settlement-days: ${FLOW_SETTLEMENT_RETENTION_DAYS:60}
+    cleanup-on-start: ${FLOW_RETENTION_CLEANUP_ON_START:true}
+
+node:
+  install-script-url: ${NODE_INSTALL_SCRIPT_URL:https://flux.mkk01.dpdns.org/install.sh}

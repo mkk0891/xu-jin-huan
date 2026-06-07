@@ -257,7 +257,7 @@ export default function IndexPage() {
         <div className="w-full max-w-md px-4 sm:px-0">
           <Card className="w-full">
             <CardHeader className="pb-0 pt-6 px-6 flex-col items-center">
-              <h1 className={title({ size: "sm" })}>登陆</h1>
+              <h1 className={title({ size: "sm" })}>登录</h1>
               <p className="text-small text-default-500 mt-2">请输入您的账号信息</p>
             </CardHeader>
             <CardBody className="px-6 py-6">
@@ -307,15 +307,7 @@ export default function IndexPage() {
       
                <div className="fixed inset-x-0 bottom-4 text-center py-4">
                <p className="text-xs text-gray-400 dark:text-gray-500">
-                 Powered by{' '}
-                 <a 
-                   href="https://github.com/bqlpfy/flux-panel" 
-                   target="_blank" 
-                   rel="noopener noreferrer"
-                   className="text-gray-500 dark:text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors"
-                 >
-                   flux-panel
-                 </a>
+                 {siteConfig.name}
                </p>
                <p className="text-xs text-gray-400 dark:text-gray-500 mt-1">
                  v{ isWebView ? siteConfig.app_version : siteConfig.version}

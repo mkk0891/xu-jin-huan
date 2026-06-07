@@ -6,7 +6,7 @@ import toast from 'react-hot-toast';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 
 
-import { getUserPackageInfo } from "@/api";
+import { getUserPermissionInfo } from "@/api";
 
 interface UserInfo {
   flow: number;
@@ -64,7 +64,7 @@ export default function DashboardPage() {
   const [forwardList, setForwardList] = useState<Forward[]>([]);
   const [statisticsFlows, setStatisticsFlows] = useState<StatisticsFlow[]>([]);
   const [isAdmin, setIsAdmin] = useState(false);
-  
+
   const [addressModalOpen, setAddressModalOpen] = useState(false);
   const [addressModalTitle, setAddressModalTitle] = useState('');
   const [addressList, setAddressList] = useState<AddressItem[]>([]);
@@ -74,32 +74,32 @@ export default function DashboardPage() {
     // 避免重复通知，检查是否已经显示过
     const notificationKey = `expiration-${userInfo.expTime}-${tunnels.map(t => t.expTime).join(',')}`;
     const lastNotified = localStorage.getItem('lastNotified');
-    
+
     if (lastNotified === notificationKey) {
       return; // 已经通知过，不重复显示
     }
-    
+
     let hasNotification = false;
-    
+
     // 检查主账户有效期
     if (userInfo.expTime) {
       const expDate = new Date(userInfo.expTime);
       const now = new Date();
-      
+
       if (!isNaN(expDate.getTime()) && expDate > now) {
         const diffTime = expDate.getTime() - now.getTime();
         const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-        
+
         if (diffDays <= 7 && diffDays > 0) {
           hasNotification = true;
           if (diffDays === 1) {
-            toast('账户将于明天过期，请及时续费', { 
+            toast('账户将于明天过期，请及时续费', {
               icon: '⚠️',
               duration: 6000,
               style: { background: '#f59e0b', color: '#fff' }
             });
           } else {
-            toast(`账户将于${diffDays}天后过期，请及时续费`, { 
+            toast(`账户将于${diffDays}天后过期，请及时续费`, {
               icon: '⚠️',
               duration: 6000,
               style: { background: '#f59e0b', color: '#fff' }
@@ -107,7 +107,7 @@ export default function DashboardPage() {
           }
         } else if (diffDays <= 0) {
           hasNotification = true;
-          toast('账户已过期，请立即续费', { 
+          toast('账户已过期，请立即续费', {
             icon: '⚠️',
             duration: 8000,
             style: { background: '#ef4444', color: '#fff' }
@@ -115,27 +115,27 @@ export default function DashboardPage() {
         }
       }
     }
-    
+
     // 检查隧道有效期
     tunnels.forEach(tunnel => {
       if (tunnel.expTime) {
         const expDate = new Date(tunnel.expTime);
         const now = new Date();
-        
+
         if (!isNaN(expDate.getTime()) && expDate > now) {
           const diffTime = expDate.getTime() - now.getTime();
           const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-          
+
           if (diffDays <= 7 && diffDays > 0) {
             hasNotification = true;
             if (diffDays === 1) {
-              toast(`隧道"${tunnel.tunnelName}"将于明天过期`, { 
+              toast(`隧道"${tunnel.tunnelName}"将于明天过期`, {
                 icon: '⚠️',
                 duration: 5000,
                 style: { background: '#f59e0b', color: '#fff' }
               });
             } else {
-              toast(`隧道"${tunnel.tunnelName}"将于${diffDays}天后过期`, { 
+              toast(`隧道"${tunnel.tunnelName}"将于${diffDays}天后过期`, {
                 icon: '⚠️',
                 duration: 5000,
                 style: { background: '#f59e0b', color: '#fff' }
@@ -143,7 +143,7 @@ export default function DashboardPage() {
             }
           } else if (diffDays <= 0) {
             hasNotification = true;
-            toast(`隧道"${tunnel.tunnelName}"已过期`, { 
+            toast(`隧道"${tunnel.tunnelName}"已过期`, {
               icon: '⚠️',
               duration: 6000,
               style: { background: '#ef4444', color: '#fff' }
@@ -152,7 +152,7 @@ export default function DashboardPage() {
         }
       }
     });
-    
+
     // 如果显示了通知，记录防止重复
     if (hasNotification) {
       localStorage.setItem('lastNotified', notificationKey);
@@ -166,34 +166,34 @@ export default function DashboardPage() {
     setUserTunnels([]);
     setForwardList([]);
     setStatisticsFlows([]);
-    
+
     // 检查用户是否是管理员
     const adminStatus = localStorage.getItem('admin');
     setIsAdmin(adminStatus === 'true');
-    
-    loadPackageData();
+
+    loadPermissionData();
     localStorage.setItem('e', '/dashboard');
   }, []);
 
-  const loadPackageData = async () => {
+  const loadPermissionData = async () => {
     setLoading(true);
     try {
-      const res = await getUserPackageInfo();
+      const res = await getUserPermissionInfo();
       if (res.code === 0) {
         const data = res.data;
         setUserInfo(data.userInfo || {});
         setUserTunnels(data.tunnelPermissions || []);
         setForwardList(data.forwards || []);
         setStatisticsFlows(data.statisticsFlows || []);
-        
+
         // 检查有效期并显示通知
         checkExpirationNotifications(data.userInfo, data.tunnelPermissions || []);
       } else {
-        toast.error(res.msg || '获取套餐信息失败');
+        toast.error(res.msg || '获取权限信息失败');
       }
     } catch (error) {
-      console.error('获取套餐信息失败:', error);
-      toast.error('获取套餐信息失败');
+      console.error('获取权限信息失败:', error);
+      toast.error('获取权限信息失败');
     } finally {
       setLoading(false);
     }
@@ -204,7 +204,7 @@ export default function DashboardPage() {
     if (value === 99999) {
       return '无限制';
     }
-    
+
     if (unit === 'gb') {
       return value + ' GB';
     } else {
@@ -252,28 +252,28 @@ export default function DashboardPage() {
 
 
   const getExpStatus = (expTime?: string) => {
-    if (!expTime) return { 
-      color: 'text-green-600 dark:text-green-400', 
+    if (!expTime) return {
+      color: 'text-green-600 dark:text-green-400',
       bg: 'bg-green-50 dark:bg-green-500/10 border-green-200 dark:border-green-500/20',
-      text: '永久' 
+      text: '永久'
     };
 
     const now = new Date();
     const expDate = new Date(expTime);
 
     if (isNaN(expDate.getTime())) {
-      return { 
-        color: 'text-gray-600 dark:text-gray-400', 
+      return {
+        color: 'text-gray-600 dark:text-gray-400',
         bg: 'bg-gray-50 dark:bg-black/10 border-gray-200 dark:border-gray-500/20',
-        text: '无效' 
+        text: '无效'
       };
     }
 
     if (expDate < now) {
-      return { 
-        color: 'text-red-600 dark:text-red-400', 
+      return {
+        color: 'text-red-600 dark:text-red-400',
         bg: 'bg-red-50 dark:bg-red-500/10 border-red-200 dark:border-red-500/20',
-        text: '已过期' 
+        text: '已过期'
       };
     }
 
@@ -281,22 +281,22 @@ export default function DashboardPage() {
     const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
 
     if (diffDays <= 7) {
-      return { 
-        color: 'text-red-600 dark:text-red-400', 
+      return {
+        color: 'text-red-600 dark:text-red-400',
         bg: 'bg-red-50 dark:bg-red-500/10 border-red-200 dark:border-red-500/20',
-        text: `${diffDays}天后过期` 
+        text: `${diffDays}天后过期`
       };
     } else if (diffDays <= 30) {
-      return { 
-        color: 'text-orange-600 dark:text-orange-400', 
+      return {
+        color: 'text-orange-600 dark:text-orange-400',
         bg: 'bg-orange-50 dark:bg-orange-500/10 border-orange-200 dark:border-orange-500/20',
-        text: `${diffDays}天后过期` 
+        text: `${diffDays}天后过期`
       };
     } else {
-      return { 
-        color: 'text-green-600 dark:text-green-400', 
+      return {
+        color: 'text-green-600 dark:text-green-400',
         bg: 'bg-green-50 dark:bg-green-500/10 border-green-200 dark:border-green-500/20',
-        text: `${diffDays}天后过期` 
+        text: `${diffDays}天后过期`
       };
     }
   };
@@ -331,7 +331,7 @@ export default function DashboardPage() {
 
   const renderProgressBar = (percentage: number, size: 'sm' | 'md' = 'md', isUnlimited: boolean = false) => {
     const height = size === 'sm' ? 'h-1.5' : 'h-2';
-    
+
     if (isUnlimited) {
       return (
         <div className="w-full">
@@ -341,11 +341,11 @@ export default function DashboardPage() {
         </div>
       );
     }
-    
+
     return (
       <div className="w-full">
         <div className={`w-full bg-gray-200 dark:bg-gray-800 rounded-full ${height}`}>
-          <div 
+          <div
             className={`${height} rounded-full transition-all duration-300 ${getUsageColor(percentage)}`}
             style={{ width: `${Math.min(percentage, 100)}%` }}
           ></div>
@@ -385,10 +385,10 @@ export default function DashboardPage() {
   const formatResetTime = (resetDay?: number): string => {
     if (resetDay === undefined || resetDay === null) return '';
     if (resetDay === 0) return '不重置';
-    
+
     const now = new Date();
     const currentDay = now.getDate();
-    
+
     let daysUntilReset;
     if (resetDay > currentDay) {
       daysUntilReset = resetDay - currentDay;
@@ -399,7 +399,7 @@ export default function DashboardPage() {
     } else {
       daysUntilReset = 0;
     }
-    
+
     if (daysUntilReset === 0) {
       return '今日重置';
     } else if (daysUntilReset === 1) {
@@ -426,11 +426,11 @@ export default function DashboardPage() {
 
   const formatInAddress = (ipString: string, port: number): string => {
     if (!ipString || !port) return '';
-    
+
     const ips = ipString.split(',').map(ip => ip.trim()).filter(ip => ip);
-    
+
     if (ips.length === 0) return '';
-    
+
     if (ips.length === 1) {
       const ip = ips[0];
       if (ip.includes(':') && !ip.startsWith('[')) {
@@ -439,30 +439,30 @@ export default function DashboardPage() {
         return `${ip}:${port}`;
       }
     }
-    
+
     const firstIp = ips[0];
     let formattedFirstIp;
-    
+
     if (firstIp.includes(':') && !firstIp.startsWith('[')) {
       formattedFirstIp = `[${firstIp}]`;
     } else {
       formattedFirstIp = firstIp;
     }
-    
+
     return `${formattedFirstIp}:${port} (+${ips.length - 1})`;
   };
 
   const formatRemoteAddress = (remoteAddr: string): string => {
     if (!remoteAddr) return '';
-    
+
     const addresses = remoteAddr.split(',').map(addr => addr.trim()).filter(addr => addr);
-    
+
     if (addresses.length === 0) return '';
-    
+
     if (addresses.length === 1) {
       return addresses[0];
     }
-    
+
     return `${addresses[0]} (+${addresses.length - 1})`;
   };
 
@@ -480,14 +480,14 @@ export default function DashboardPage() {
 
   const showAddressModal = (ipString: string, port: number, title: string) => {
     if (!ipString || !port) return;
-    
+
     const ips = ipString.split(',').map(ip => ip.trim()).filter(ip => ip);
-    
+
     if (ips.length <= 1) {
               copyToClipboard(formatInAddress(ipString, port));
       return;
     }
-    
+
     const formattedList = ips.map((ip, index) => {
       let formattedAddress;
       if (ip.includes(':') && !ip.startsWith('[')) {
@@ -502,7 +502,7 @@ export default function DashboardPage() {
         copying: false
       };
     });
-    
+
     setAddressList(formattedList);
     setAddressModalTitle(`${title} (${ips.length}个)`);
     setAddressModalOpen(true);
@@ -510,14 +510,14 @@ export default function DashboardPage() {
 
   const showRemoteAddressModal = (remoteAddr: string, title: string) => {
     if (!remoteAddr) return;
-    
+
     const addresses = remoteAddr.split(',').map(addr => addr.trim()).filter(addr => addr);
-    
+
     if (addresses.length <= 1) {
               copyToClipboard(remoteAddr);
       return;
     }
-    
+
     const formattedList = addresses.map((address, index) => {
       return {
         id: index,
@@ -526,7 +526,7 @@ export default function DashboardPage() {
         copying: false
       };
     });
-    
+
     setAddressList(formattedList);
     setAddressModalTitle(`${title} (${addresses.length}个)`);
     setAddressModalOpen(true);
@@ -543,14 +543,14 @@ export default function DashboardPage() {
 
   const copyAddress = async (addressItem: AddressItem) => {
     try {
-      setAddressList(prev => prev.map(item => 
+      setAddressList(prev => prev.map(item =>
         item.id === addressItem.id ? { ...item, copying: true } : item
       ));
       await copyToClipboard(addressItem.address);
     } catch (error) {
       toast.error('复制失败');
     } finally {
-      setAddressList(prev => prev.map(item => 
+      setAddressList(prev => prev.map(item =>
         item.id === addressItem.id ? { ...item, copying: false } : item
       ));
     }
@@ -564,17 +564,17 @@ export default function DashboardPage() {
 
   const calculateForwardBillingFlow = (forward: Forward): number => {
     if (!forward) return 0;
-    
+
     const inFlow = forward.inFlow || 0;
     const outFlow = forward.outFlow || 0;
-    
+
     // 后端已按计费类型处理流量，前端直接使用入站+出站总和
     return inFlow + outFlow;
   };
 
       if (loading) {
       return (
-        
+
           <div className="px-3 lg:px-6 flex-grow pt-2 lg:pt-4">
             <div className="flex items-center justify-center h-64">
               <div className="flex items-center gap-3">
@@ -583,12 +583,12 @@ export default function DashboardPage() {
               </div>
             </div>
           </div>
-        
+
       );
     }
 
       return (
-      
+
         <div className="px-3 lg:px-6 py-2 lg:py-4">
 
                           {/* 响应式统计卡片 */}
@@ -707,13 +707,13 @@ export default function DashboardPage() {
                      <ResponsiveContainer width="100%" height="100%">
                        <LineChart data={processFlowChartData()}>
                          <CartesianGrid strokeDasharray="3 3" className="opacity-30" />
-                         <XAxis 
-                           dataKey="time" 
+                         <XAxis
+                           dataKey="time"
                            tick={{ fontSize: 12 }}
                            tickLine={false}
                            axisLine={{ stroke: '#e5e7eb', strokeWidth: 1 }}
                          />
-                         <YAxis 
+                         <YAxis
                            tick={{ fontSize: 12 }}
                            tickLine={false}
                            axisLine={{ stroke: '#e5e7eb', strokeWidth: 1 }}
@@ -725,7 +725,7 @@ export default function DashboardPage() {
                              return `${(value / (1024 * 1024 * 1024)).toFixed(1)}G`;
                            }}
                          />
-                         <Tooltip 
+                         <Tooltip
                            content={({ active, payload, label }) => {
                              if (active && payload && payload.length) {
                                return (
@@ -802,7 +802,7 @@ export default function DashboardPage() {
                            </div>
                          </div>
                        </div>
-                       
+
                        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 lg:gap-4">
                          <div>
                            <p className="text-sm text-default-600 mb-1">流量配额</p>
@@ -867,7 +867,7 @@ export default function DashboardPage() {
                          {group.forwards.length} 个转发
                        </span>
                      </div>
-                     
+
                      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-4">
                        {group.forwards.map((forward) => (
                          <div key={forward.id} className="bg-white dark:bg-default-100/50 border border-gray-200 dark:border-default-200 rounded-lg p-3 hover:shadow-md transition-shadow">
@@ -875,7 +875,7 @@ export default function DashboardPage() {
                             <div>
                               <h4 className="font-medium text-foreground text-sm mb-2 truncate">{forward.name}</h4>
                               <div className="space-y-1">
-                                <code 
+                                <code
                                   className={`block px-2 py-1 bg-green-100 dark:bg-green-500/20 text-green-700 dark:text-green-300 rounded font-mono text-xs truncate ${hasMultipleIps(forward.inIp) ? 'cursor-pointer hover:bg-green-200 dark:hover:bg-green-500/30' : ''}`}
                                   onClick={() => hasMultipleIps(forward.inIp) && showAddressModal(forward.inIp, forward.inPort, '入口地址')}
                                   title={formatInAddress(forward.inIp, forward.inPort)}
@@ -883,7 +883,7 @@ export default function DashboardPage() {
                                   {formatInAddress(forward.inIp, forward.inPort)}
                                 </code>
                                 <div className="text-center text-default-400 text-xs">↓</div>
-                                <code 
+                                <code
                                   className={`block px-2 py-1 bg-blue-100 dark:bg-blue-500/20 text-blue-700 dark:text-blue-300 rounded font-mono text-xs truncate ${hasMultipleRemoteAddresses(forward.remoteAddr) ? 'cursor-pointer hover:bg-blue-200 dark:hover:bg-blue-500/30' : ''}`}
                                   onClick={() => hasMultipleRemoteAddresses(forward.remoteAddr) && showRemoteAddressModal(forward.remoteAddr, '出口地址')}
                                   title={formatRemoteAddress(forward.remoteAddr)}
@@ -892,7 +892,7 @@ export default function DashboardPage() {
                                 </code>
                               </div>
                             </div>
-                            
+
                             <div className="pt-2 border-t border-gray-200 dark:border-default-200">
                               <div className="grid grid-cols-3 gap-1 text-xs">
                                 <div className="text-center">
@@ -921,7 +921,7 @@ export default function DashboardPage() {
         </Card>
 
         {/* 地址列表弹窗 */}
-        <Modal isOpen={addressModalOpen} onClose={() => setAddressModalOpen(false)} size="2xl" 
+        <Modal isOpen={addressModalOpen} onClose={() => setAddressModalOpen(false)} size="2xl"
         scrollBehavior="outside"
         backdrop="blur"
         placement="center">
@@ -933,7 +933,7 @@ export default function DashboardPage() {
                   复制全部
                 </Button>
               </div>
-              
+
               <div className="space-y-2 max-h-60 overflow-y-auto">
                 {addressList.map((item) => (
                   <div key={item.id} className="flex justify-between items-center p-3 border border-default-200 dark:border-default-100 rounded-lg">
@@ -953,6 +953,6 @@ export default function DashboardPage() {
           </ModalContent>
         </Modal>
       </div>
-          
+
   );
-} 
+}

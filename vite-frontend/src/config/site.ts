@@ -3,20 +3,20 @@ import { getConfigByName, getConfigs } from '@/api';
 export type SiteConfig = typeof siteConfig;
 
 // 缓存相关常量
-const CACHE_PREFIX = 'vite_config_';
+export const CONFIG_CACHE_PREFIX = 'xu_jin_huan_config_';
 const VERSION = "1.4.3";
 const APP_VERSION = "1.0.3";
 
 const getInitialConfig = () => {
   if (typeof window === 'undefined') {
     return {
-      name: "flux",
+      name: "须尽欢",
       version: VERSION,
       app_version: APP_VERSION,
     };
   }
 
-  const cachedAppName = localStorage.getItem(CACHE_PREFIX + 'app_name');
+  const cachedAppName = localStorage.getItem(CONFIG_CACHE_PREFIX + 'app_name');
     if (cachedAppName) {
       return {
         name: cachedAppName,
@@ -25,7 +25,7 @@ const getInitialConfig = () => {
       };
     }
   return {
-    name: "flux",
+    name: "须尽欢",
     version: VERSION,
     app_version: APP_VERSION,
   };
@@ -37,19 +37,19 @@ export const siteConfig = getInitialConfig();
 export const configCache = {
   // 获取缓存的配置
   get: (key: string): string | null => {
-    const cacheKey = CACHE_PREFIX + key;
+    const cacheKey = CONFIG_CACHE_PREFIX + key;
       return localStorage.getItem(cacheKey);
   },
 
   // 设置缓存的配置
   set: (key: string, value: string): void => {
-    const cacheKey = CACHE_PREFIX + key;
+    const cacheKey = CONFIG_CACHE_PREFIX + key;
       localStorage.setItem(cacheKey, value);
   },
 
   // 删除指定配置的缓存
   remove: (key: string): void => {
-    const cacheKey = CACHE_PREFIX + key;
+    const cacheKey = CONFIG_CACHE_PREFIX + key;
     localStorage.removeItem(cacheKey);
   },
 
@@ -58,7 +58,7 @@ export const configCache = {
    // 获取所有localStorage的key
    const keys = Object.keys(localStorage);
    keys.forEach(key => {
-     if (key.startsWith(CACHE_PREFIX)) {
+     if (key.startsWith(CONFIG_CACHE_PREFIX)) {
        localStorage.removeItem(key);
      }
    });

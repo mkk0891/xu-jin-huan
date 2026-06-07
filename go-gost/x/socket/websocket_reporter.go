@@ -65,6 +65,19 @@ type CommandResponse struct {
 	RequestId string      `json:"requestId,omitempty"`
 }
 
+type BatchApplyResult struct {
+	Steps []BatchApplyStepResult `json:"steps"`
+}
+
+type BatchApplyStepResult struct {
+	Index        int         `json:"index"`
+	Type         string      `json:"type"`
+	Success      bool        `json:"success"`
+	Message      string      `json:"message"`
+	ResponseType string      `json:"responseType,omitempty"`
+	Data         interface{} `json:"data,omitempty"`
+}
+
 // TcpPingRequest TCP ping请求结构体
 type TcpPingRequest struct {
 	IP        string `json:"ip"`
@@ -495,68 +508,12 @@ func (w *WebSocketReporter) routeCommand(cmd CommandMessage) {
 	}
 
 	fmt.Println("🔔 收到命令: ", string(jsonBytes))
-	var err error
 	var response CommandResponse
 
 	// 传递 requestId
 	response.RequestId = cmd.RequestId
-
-	switch cmd.Type {
-	// Service 相关命令
-	case "AddService":
-		err = w.handleAddService(cmd.Data)
-		response.Type = "AddServiceResponse"
-	case "UpdateService":
-		err = w.handleUpdateService(cmd.Data)
-		response.Type = "UpdateServiceResponse"
-	case "DeleteService":
-		err = w.handleDeleteService(cmd.Data)
-		response.Type = "DeleteServiceResponse"
-	case "PauseService":
-		err = w.handlePauseService(cmd.Data)
-		response.Type = "PauseServiceResponse"
-	case "ResumeService":
-		err = w.handleResumeService(cmd.Data)
-		response.Type = "ResumeServiceResponse"
-
-	// Chain 相关命令
-	case "AddChains":
-		err = w.handleAddChain(cmd.Data)
-		response.Type = "AddChainsResponse"
-	case "UpdateChains":
-		err = w.handleUpdateChain(cmd.Data)
-		response.Type = "UpdateChainsResponse"
-	case "DeleteChains":
-		err = w.handleDeleteChain(cmd.Data)
-		response.Type = "DeleteChainsResponse"
-
-	// Limiter 相关命令
-	case "AddLimiters":
-		err = w.handleAddLimiter(cmd.Data)
-		response.Type = "AddLimitersResponse"
-	case "UpdateLimiters":
-		err = w.handleUpdateLimiter(cmd.Data)
-		response.Type = "UpdateLimitersResponse"
-	case "DeleteLimiters":
-		err = w.handleDeleteLimiter(cmd.Data)
-		response.Type = "DeleteLimitersResponse"
-
-	// TCP Ping 诊断命令
-	case "TcpPing":
-		var tcpPingResult TcpPingResponse
-		tcpPingResult, err = w.handleTcpPing(cmd.Data)
-		response.Type = "TcpPingResponse"
-		response.Data = tcpPingResult
-
-	// Protocol blocking switches
-	case "SetProtocol":
-		err = w.handleSetProtocol(cmd.Data)
-		response.Type = "SetProtocolResponse"
-
-	default:
-		err = fmt.Errorf("未知命令类型: %s", cmd.Type)
-		response.Type = "UnknownCommandResponse"
-	}
+	var err error
+	response.Type, response.Data, err = w.executeCommand(cmd.Type, cmd.Data)
 
 	// 发送响应
 	if err != nil {
@@ -572,48 +529,128 @@ func (w *WebSocketReporter) routeCommand(cmd CommandMessage) {
 	w.sendResponse(response)
 }
 
+func (w *WebSocketReporter) executeCommand(cmdType string, data interface{}) (string, interface{}, error) {
+	var err error
+	var responseData interface{}
+	responseType := ""
+
+	switch cmdType {
+	// Service 相关命令
+	case "AddService":
+		err = w.handleAddService(data)
+		responseType = "AddServiceResponse"
+	case "UpdateService":
+		err = w.handleUpdateService(data)
+		responseType = "UpdateServiceResponse"
+	case "UpsertService":
+		err = w.handleUpsertService(data)
+		responseType = "UpsertServiceResponse"
+	case "DeleteService":
+		err = w.handleDeleteService(data)
+		responseType = "DeleteServiceResponse"
+	case "PauseService":
+		err = w.handlePauseService(data)
+		responseType = "PauseServiceResponse"
+	case "ResumeService":
+		err = w.handleResumeService(data)
+		responseType = "ResumeServiceResponse"
+
+	// Chain 相关命令
+	case "AddChains":
+		err = w.handleAddChain(data)
+		responseType = "AddChainsResponse"
+	case "UpdateChains":
+		err = w.handleUpdateChain(data)
+		responseType = "UpdateChainsResponse"
+	case "UpsertChains":
+		err = w.handleUpsertChain(data)
+		responseType = "UpsertChainsResponse"
+	case "DeleteChains":
+		err = w.handleDeleteChain(data)
+		responseType = "DeleteChainsResponse"
+
+	// Limiter 相关命令
+	case "AddLimiters":
+		err = w.handleAddLimiter(data)
+		responseType = "AddLimitersResponse"
+	case "UpdateLimiters":
+		err = w.handleUpdateLimiter(data)
+		responseType = "UpdateLimitersResponse"
+	case "UpsertLimiters":
+		err = w.handleUpsertLimiter(data)
+		responseType = "UpsertLimitersResponse"
+	case "DeleteLimiters":
+		err = w.handleDeleteLimiter(data)
+		responseType = "DeleteLimitersResponse"
+
+	// TCP Ping 诊断命令
+	case "TcpPing":
+		var tcpPingResult TcpPingResponse
+		tcpPingResult, err = w.handleTcpPing(data)
+		responseType = "TcpPingResponse"
+		responseData = tcpPingResult
+
+	// Protocol blocking switches
+	case "SetProtocol":
+		err = w.handleSetProtocol(data)
+		responseType = "SetProtocolResponse"
+
+	case "BatchApply":
+		responseData, err = w.handleBatchApply(data)
+		responseType = "BatchApplyResponse"
+
+	default:
+		err = fmt.Errorf("未知命令类型: %s", cmdType)
+		responseType = "UnknownCommandResponse"
+	}
+
+	return responseType, responseData, err
+}
+
 // Service 命令处理函数
 func (w *WebSocketReporter) handleAddService(data interface{}) error {
-	// 将 interface{} 转换为 JSON 再解析为具体类型
-	jsonData, err := json.Marshal(data)
+	services, err := w.parseServiceConfigs(data)
 	if err != nil {
-		return fmt.Errorf("序列化数据失败: %v", err)
+		return err
 	}
-
-	// 预处理：将字符串格式的 duration 转换为纳秒数
-	processedData, err := w.preprocessDurationFields(jsonData)
-	if err != nil {
-		return fmt.Errorf("预处理duration字段失败: %v", err)
-	}
-
-	var services []config.ServiceConfig
-	if err := json.Unmarshal(processedData, &services); err != nil {
-		return fmt.Errorf("解析服务配置失败: %v", err)
-	}
-
 	req := createServicesRequest{Data: services}
 	return createServices(req)
 }
 
 func (w *WebSocketReporter) handleUpdateService(data interface{}) error {
+	services, err := w.parseServiceConfigs(data)
+	if err != nil {
+		return err
+	}
+	req := updateServicesRequest{Data: services}
+	return updateServices(req)
+}
+
+func (w *WebSocketReporter) handleUpsertService(data interface{}) error {
+	services, err := w.parseServiceConfigs(data)
+	if err != nil {
+		return err
+	}
+	req := updateServicesRequest{Data: services}
+	return upsertServices(req)
+}
+
+func (w *WebSocketReporter) parseServiceConfigs(data interface{}) ([]config.ServiceConfig, error) {
 	jsonData, err := json.Marshal(data)
 	if err != nil {
-		return fmt.Errorf("序列化数据失败: %v", err)
+		return nil, fmt.Errorf("序列化数据失败: %v", err)
 	}
 
-	// 预处理：将字符串格式的 duration 转换为纳秒数
 	processedData, err := w.preprocessDurationFields(jsonData)
 	if err != nil {
-		return fmt.Errorf("预处理duration字段失败: %v", err)
+		return nil, fmt.Errorf("预处理duration字段失败: %v", err)
 	}
 
 	var services []config.ServiceConfig
 	if err := json.Unmarshal(processedData, &services); err != nil {
-		return fmt.Errorf("解析服务配置失败: %v", err)
+		return nil, fmt.Errorf("解析服务配置失败: %v", err)
 	}
-
-	req := updateServicesRequest{Data: services}
-	return updateServices(req)
+	return services, nil
 }
 
 func (w *WebSocketReporter) handleDeleteService(data interface{}) error {
@@ -675,33 +712,42 @@ func (w *WebSocketReporter) handleAddChain(data interface{}) error {
 }
 
 func (w *WebSocketReporter) handleUpdateChain(data interface{}) error {
-	jsonData, err := json.Marshal(data)
+	req, err := w.parseChainUpdateRequest(data)
 	if err != nil {
-		return fmt.Errorf("序列化数据失败: %v", err)
-	}
-
-	// 对于更新操作，Java端发送的格式可能是: {"chain": "name", "data": {...}}
-	var updateReq struct {
-		Chain string             `json:"chain"`
-		Data  config.ChainConfig `json:"data"`
-	}
-
-	// 尝试解析为更新请求格式
-	if err := json.Unmarshal(jsonData, &updateReq); err != nil {
-		// 如果失败，可能是直接的ChainConfig，从name字段获取chain名称
-		var chainConfig config.ChainConfig
-		if err := json.Unmarshal(jsonData, &chainConfig); err != nil {
-			return fmt.Errorf("解析链配置失败: %v", err)
-		}
-		updateReq.Chain = chainConfig.Name
-		updateReq.Data = chainConfig
-	}
-
-	req := updateChainRequest{
-		Chain: updateReq.Chain,
-		Data:  updateReq.Data,
+		return err
 	}
 	return updateChain(req)
+}
+
+func (w *WebSocketReporter) handleUpsertChain(data interface{}) error {
+	req, err := w.parseChainUpdateRequest(data)
+	if err != nil {
+		return err
+	}
+	return upsertChain(req)
+}
+
+func (w *WebSocketReporter) parseChainUpdateRequest(data interface{}) (updateChainRequest, error) {
+	jsonData, err := json.Marshal(data)
+	if err != nil {
+		return updateChainRequest{}, fmt.Errorf("序列化数据失败: %v", err)
+	}
+
+	var updateReq updateChainRequest
+	if err := json.Unmarshal(jsonData, &updateReq); err == nil &&
+		(strings.TrimSpace(updateReq.Chain) != "" || strings.TrimSpace(updateReq.Data.Name) != "") {
+		return updateReq, nil
+	}
+
+	var chainConfig config.ChainConfig
+	if err := json.Unmarshal(jsonData, &chainConfig); err != nil {
+		return updateChainRequest{}, fmt.Errorf("解析链配置失败: %v", err)
+	}
+
+	return updateChainRequest{
+		Chain: chainConfig.Name,
+		Data:  chainConfig,
+	}, nil
 }
 
 func (w *WebSocketReporter) handleDeleteChain(data interface{}) error {
@@ -743,33 +789,42 @@ func (w *WebSocketReporter) handleAddLimiter(data interface{}) error {
 }
 
 func (w *WebSocketReporter) handleUpdateLimiter(data interface{}) error {
-	jsonData, err := json.Marshal(data)
+	req, err := w.parseLimiterUpdateRequest(data)
 	if err != nil {
-		return fmt.Errorf("序列化数据失败: %v", err)
-	}
-
-	// 对于更新操作，Java端发送的格式可能是: {"limiter": "name", "data": {...}}
-	var updateReq struct {
-		Limiter string               `json:"limiter"`
-		Data    config.LimiterConfig `json:"data"`
-	}
-
-	// 尝试解析为更新请求格式
-	if err := json.Unmarshal(jsonData, &updateReq); err != nil {
-		// 如果失败，可能是直接的LimiterConfig，从name字段获取limiter名称
-		var limiterConfig config.LimiterConfig
-		if err := json.Unmarshal(jsonData, &limiterConfig); err != nil {
-			return fmt.Errorf("解析限流器配置失败: %v", err)
-		}
-		updateReq.Limiter = limiterConfig.Name
-		updateReq.Data = limiterConfig
-	}
-
-	req := updateLimiterRequest{
-		Limiter: updateReq.Limiter,
-		Data:    updateReq.Data,
+		return err
 	}
 	return updateLimiter(req)
+}
+
+func (w *WebSocketReporter) handleUpsertLimiter(data interface{}) error {
+	req, err := w.parseLimiterUpdateRequest(data)
+	if err != nil {
+		return err
+	}
+	return upsertLimiter(req)
+}
+
+func (w *WebSocketReporter) parseLimiterUpdateRequest(data interface{}) (updateLimiterRequest, error) {
+	jsonData, err := json.Marshal(data)
+	if err != nil {
+		return updateLimiterRequest{}, fmt.Errorf("序列化数据失败: %v", err)
+	}
+
+	var updateReq updateLimiterRequest
+	if err := json.Unmarshal(jsonData, &updateReq); err == nil &&
+		(strings.TrimSpace(updateReq.Limiter) != "" || strings.TrimSpace(updateReq.Data.Name) != "") {
+		return updateReq, nil
+	}
+
+	var limiterConfig config.LimiterConfig
+	if err := json.Unmarshal(jsonData, &limiterConfig); err != nil {
+		return updateLimiterRequest{}, fmt.Errorf("解析限流器配置失败: %v", err)
+	}
+
+	return updateLimiterRequest{
+		Limiter: limiterConfig.Name,
+		Data:    limiterConfig,
+	}, nil
 }
 
 func (w *WebSocketReporter) handleDeleteLimiter(data interface{}) error {
@@ -792,6 +847,64 @@ func (w *WebSocketReporter) handleDeleteLimiter(data interface{}) error {
 	}
 
 	return deleteLimiter(deleteReq)
+}
+
+func (w *WebSocketReporter) handleBatchApply(data interface{}) (BatchApplyResult, error) {
+	result := BatchApplyResult{}
+	jsonData, err := json.Marshal(data)
+	if err != nil {
+		return result, fmt.Errorf("序列化批量命令失败: %v", err)
+	}
+
+	var wrapper struct {
+		Commands []CommandMessage `json:"commands"`
+	}
+	var commands []CommandMessage
+	if err := json.Unmarshal(jsonData, &wrapper); err == nil && len(wrapper.Commands) > 0 {
+		commands = wrapper.Commands
+	} else if err := json.Unmarshal(jsonData, &commands); err != nil {
+		return result, fmt.Errorf("解析批量命令失败: %v", err)
+	}
+
+	if len(commands) == 0 {
+		return result, fmt.Errorf("批量命令不能为空")
+	}
+
+	for i, cmd := range commands {
+		step := BatchApplyStepResult{
+			Index: i,
+			Type:  cmd.Type,
+		}
+
+		if strings.TrimSpace(cmd.Type) == "" {
+			step.Success = false
+			step.Message = "命令类型不能为空"
+			result.Steps = append(result.Steps, step)
+			return result, fmt.Errorf("批量命令第%d步失败: %s", i, step.Message)
+		}
+		if cmd.Type == "BatchApply" {
+			step.Success = false
+			step.Message = "BatchApply不支持嵌套执行"
+			result.Steps = append(result.Steps, step)
+			return result, fmt.Errorf("批量命令第%d步失败: %s", i, step.Message)
+		}
+
+		responseType, responseData, err := w.executeCommand(cmd.Type, cmd.Data)
+		step.ResponseType = responseType
+		step.Data = responseData
+		if err != nil {
+			step.Success = false
+			step.Message = err.Error()
+			result.Steps = append(result.Steps, step)
+			return result, fmt.Errorf("批量命令第%d步失败: %s", i, step.Message)
+		}
+
+		step.Success = true
+		step.Message = "OK"
+		result.Steps = append(result.Steps, step)
+	}
+
+	return result, nil
 }
 
 // handleSetProtocol 处理设置屏蔽协议的命令

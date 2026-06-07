@@ -64,6 +64,8 @@ public class Tunnel extends BaseEntity {
      */
     private BigDecimal trafficRatio;
 
+    private String billingMode;
+
 
     private String tcpListenAddr;
 

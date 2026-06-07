@@ -64,6 +64,23 @@ func updateLimiter(req updateLimiterRequest) error {
 	return nil
 }
 
+func upsertLimiter(req updateLimiterRequest) error {
+	name := strings.TrimSpace(req.Limiter)
+	if name == "" {
+		name = strings.TrimSpace(req.Data.Name)
+	}
+	if name == "" {
+		return errors.New("limiter name is required")
+	}
+
+	req.Limiter = name
+	req.Data.Name = name
+	if registry.TrafficLimiterRegistry().IsRegistered(name) {
+		return updateLimiter(req)
+	}
+	return createLimiter(createLimiterRequest{Data: req.Data})
+}
+
 func deleteLimiter(req deleteLimiterRequest) error {
 
 	name := strings.TrimSpace(req.Limiter)

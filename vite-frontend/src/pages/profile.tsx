@@ -89,6 +89,28 @@ export default function ProfilePage() {
       ),
       color: 'bg-purple-100 dark:bg-purple-500/20 text-purple-600 dark:text-purple-400',
       description: '配置网站设置'
+    },
+    {
+      path: '/flow-ledger',
+      label: '流量账本',
+      icon: (
+        <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
+          <path fillRule="evenodd" d="M4 3a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V7.414A2 2 0 0017.414 6L15 3.586A2 2 0 0013.586 3H4zm1 3a1 1 0 011-1h6a1 1 0 110 2H6a1 1 0 01-1-1zm0 4a1 1 0 011-1h8a1 1 0 110 2H6a1 1 0 01-1-1zm1 3a1 1 0 100 2h5a1 1 0 100-2H6z" clipRule="evenodd" />
+        </svg>
+      ),
+      color: 'bg-emerald-100 dark:bg-emerald-500/20 text-emerald-600 dark:text-emerald-400',
+      description: '查看计费流水'
+    },
+    {
+      path: '/flow-settlement',
+      label: '结算记录',
+      icon: (
+        <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
+          <path fillRule="evenodd" d="M5 2a1 1 0 00-1 1v14a1 1 0 001.447.894L10 15.618l4.553 2.276A1 1 0 0016 17V3a1 1 0 00-1-1H5zm2 4a1 1 0 000 2h6a1 1 0 100-2H7zm0 4a1 1 0 100 2h3a1 1 0 100-2H7z" clipRule="evenodd" />
+        </svg>
+      ),
+      color: 'bg-amber-100 dark:bg-amber-500/20 text-amber-600 dark:text-amber-400',
+      description: '查看清零快照'
     }
   ];
 
@@ -240,15 +262,7 @@ export default function ProfilePage() {
 
         <div className="fixed inset-x-0 bottom-20 text-center py-4">
                <p className="text-xs text-gray-400 dark:text-gray-500">
-                 Powered by{' '}
-                 <a 
-                   href="https://github.com/bqlpfy/flux-panel" 
-                   target="_blank" 
-                   rel="noopener noreferrer"
-                   className="text-gray-500 dark:text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors"
-                 >
-                   flux-panel
-                 </a>
+                 {siteConfig.name}
                </p>
                <p className="text-xs text-gray-400 dark:text-gray-500 mt-1">
                  v{ isWebViewFunc() ? siteConfig.app_version : siteConfig.version}

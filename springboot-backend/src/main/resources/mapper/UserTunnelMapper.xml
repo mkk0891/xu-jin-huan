@@ -16,6 +16,8 @@
             ut.exp_time as expTime,
             ut.speed_id as speedId,
             ut.status as status,
+            ut.billing_mode as billingMode,
+            ut.traffic_ratio as trafficRatio,
             t.name as tunnelName,
             t.flow as tunnelFlow,
             t.in_ip as inIp,

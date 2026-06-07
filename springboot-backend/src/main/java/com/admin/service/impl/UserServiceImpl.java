@@ -31,7 +31,7 @@ import java.util.Objects;
 /**
  * <p>
  * 用户服务实现类
- * 提供用户的增删改查功能，包括用户登录、创建、更新、删除和套餐信息查询
+ * 提供用户的增删改查功能，包括用户登录、创建、更新、删除和权限信息查询
  * 支持用户关联数据的级联删除，包括转发和Gost服务的清理
  * </p>
  *
@@ -72,7 +72,7 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements Us
     private static final String ERROR_CANNOT_DELETE_ADMIN = "不能删除管理员用户";
     private static final String ERROR_CANNOT_UPDATE_ADMIN = "不能修改管理员用户信息";
     private static final String ERROR_USER_NOT_LOGGED_IN = "用户未登录或token无效";
-    private static final String ERROR_GET_PACKAGE_INFO_FAILED = "获取套餐信息失败";
+    private static final String ERROR_GET_PERMISSION_INFO_FAILED = "获取权限信息失败";
     private static final String ERROR_CURRENT_PASSWORD_WRONG = "当前密码错误";
     private static final String ERROR_PASSWORD_NOT_MATCH = "新密码和确认密码不匹配";
 
@@ -114,6 +114,9 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements Us
 
     @Resource
     StatisticsFlowService statisticsFlowService;
+
+    @Resource
+    FlowSettlementService flowSettlementService;
 
     @Resource
     private ImageCaptchaApplication application;
@@ -267,27 +270,27 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements Us
     }
 
     /**
-     * 获取用户套餐信息
+     * 获取用户权限信息
      * 包括用户基本信息、隧道权限详情和转发详情
      * 
-     * @return 用户套餐信息响应
+     * @return 用户权限信息响应
      */
     @Override
-    public R getUserPackageInfo() {
+    public R getUserPermissionInfo() {
         try {
-                    // 1. 获取当前用户信息
-        CurrentUserInfo currentUser = getCurrentUserInfo();
-        if (currentUser.isHasError()) {
-            return R.err(currentUser.getErrorMessage());
-        }
+            // 1. 获取当前用户信息
+            CurrentUserInfo currentUser = getCurrentUserInfo();
+            if (currentUser.isHasError()) {
+                return R.err(currentUser.getErrorMessage());
+            }
 
-            // 2. 构建套餐信息
-            UserPackageDto packageDto = buildUserPackageDto(currentUser);
+            // 2. 构建权限信息
+            UserPermissionDto permissionDto = buildUserPermissionDto(currentUser);
             
-            return R.ok(packageDto);
+            return R.ok(permissionDto);
         } catch (Exception e) {
             e.printStackTrace();
-            return R.err(ERROR_GET_PACKAGE_INFO_FAILED);
+            return R.err(ERROR_GET_PERMISSION_INFO_FAILED);
         }
     }
 
@@ -348,15 +351,13 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements Us
         if (resetFlowDto.getType() == 1){ // 清零账号流量
             User user = this.getById(resetFlowDto.getId());
             if (user == null) return R.err(ERROR_USER_NOT_FOUND);
-            user.setInFlow(0L);
-            user.setOutFlow(0L);
-            this.updateById(user);
+            boolean success = flowSettlementService.settleAndResetUser(user, FlowSettlementService.TRIGGER_MANUAL);
+            if (!success) return R.err("账号流量结算重置失败");
         }else { // 清零隧道流量
             UserTunnel tunnel = userTunnelService.getById(resetFlowDto.getId());
             if (tunnel == null) return R.err("隧道不存在");
-            tunnel.setInFlow(0L);
-            tunnel.setOutFlow(0L);
-            userTunnelService.updateById(tunnel);
+            boolean success = flowSettlementService.settleAndResetUserTunnel(tunnel, FlowSettlementService.TRIGGER_MANUAL);
+            if (!success) return R.err("隧道流量结算重置失败");
         }
         return R.ok();
     }
@@ -657,35 +658,35 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements Us
     }
 
     /**
-     * 构建用户套餐信息DTO
+     * 构建用户权限信息DTO
      * 
      * @param currentUser 当前用户信息
-     * @return 用户套餐信息DTO
+     * @return 用户权限信息DTO
      */
-    private UserPackageDto buildUserPackageDto(CurrentUserInfo currentUser) {
+    private UserPermissionDto buildUserPermissionDto(CurrentUserInfo currentUser) {
         User user = currentUser.getUser();
         Integer roleId = currentUser.getRoleId();
         
         // 1. 构造用户基本信息
-        UserPackageDto.UserInfoDto userInfo = buildUserInfoDto(user);
+        UserPermissionDto.UserInfoDto userInfo = buildUserInfoDto(user);
         
         // 2. 获取隧道权限详情
-        List<UserPackageDto.UserTunnelDetailDto> tunnelPermissions = getTunnelPermissions(user.getId());
+        List<UserPermissionDto.UserTunnelDetailDto> tunnelPermissions = getTunnelPermissions(user.getId());
         
         // 3. 获取转发详情
-        List<UserPackageDto.UserForwardDetailDto> forwards = userMapper.getUserForwardDetails(user.getId().intValue());
+        List<UserPermissionDto.UserForwardDetailDto> forwards = userMapper.getUserForwardDetails(user.getId().intValue());
 
         // 4. 查询最近24小时流量信息，没有的补0
         List<StatisticsFlow> statisticsFlows = getLast24HoursFlowStatistics(user.getId());
         
         // 5. 构造返回结果
-        UserPackageDto packageDto = new UserPackageDto();
-        packageDto.setUserInfo(userInfo);
-        packageDto.setTunnelPermissions(tunnelPermissions);
-        packageDto.setForwards(forwards);
-        packageDto.setStatisticsFlows(statisticsFlows);
+        UserPermissionDto permissionDto = new UserPermissionDto();
+        permissionDto.setUserInfo(userInfo);
+        permissionDto.setTunnelPermissions(tunnelPermissions);
+        permissionDto.setForwards(forwards);
+        permissionDto.setStatisticsFlows(statisticsFlows);
         
-        return packageDto;
+        return permissionDto;
     }
 
     /**
@@ -694,8 +695,8 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements Us
      * @param user 用户对象
      * @return 用户基本信息DTO
      */
-    private UserPackageDto.UserInfoDto buildUserInfoDto(User user) {
-        UserPackageDto.UserInfoDto userInfo = new UserPackageDto.UserInfoDto();
+    private UserPermissionDto.UserInfoDto buildUserInfoDto(User user) {
+        UserPermissionDto.UserInfoDto userInfo = new UserPermissionDto.UserInfoDto();
         userInfo.setId(user.getId());
         userInfo.setUser(user.getUser());
         userInfo.setStatus(user.getStatus());
@@ -716,7 +717,7 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements Us
      * @param userId 用户ID
      * @return 隧道权限详情列表
      */
-    private List<UserPackageDto.UserTunnelDetailDto> getTunnelPermissions(Long userId) {
+    private List<UserPermissionDto.UserTunnelDetailDto> getTunnelPermissions(Long userId) {
         return userMapper.getUserTunnelDetails(userId.intValue());
     }
 

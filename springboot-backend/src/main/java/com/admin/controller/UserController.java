@@ -60,9 +60,9 @@ public class UserController extends BaseController {
     }
 
     @LogAnnotation
-    @PostMapping("/package")
-    public R getUserPackageInfo() {
-        return userService.getUserPackageInfo();
+    @PostMapping("/permission")
+    public R getUserPermissionInfo() {
+        return userService.getUserPermissionInfo();
     }
 
     @LogAnnotation

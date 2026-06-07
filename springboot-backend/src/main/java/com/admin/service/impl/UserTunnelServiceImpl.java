@@ -233,6 +233,10 @@ public class UserTunnelServiceImpl extends ServiceImpl<UserTunnelMapper, UserTun
         
         // 更新限速规则ID（允许设置为null，表示不限速）
         existingUserTunnel.setSpeedId(updateDto.getSpeedId());
+
+        // 更新计费配置（允许为空，为空时继承隧道配置）
+        existingUserTunnel.setBillingMode(updateDto.getBillingMode());
+        existingUserTunnel.setTrafficRatio(updateDto.getTrafficRatio());
     }
 
     /**
@@ -440,8 +444,7 @@ public class UserTunnelServiceImpl extends ServiceImpl<UserTunnelMapper, UserTun
                 interfaceName = forward.getInterfaceName();
             }
 
-            // 6. 更新入口节点的主服务限速配置（使用批量UpdateService接口）
-            GostUtil.UpdateService(inNode.getId(), serviceName, forward.getInPort(), speedId, forward.getRemoteAddr(), tunnel.getType(), tunnel, forward.getStrategy(), interfaceName);
+            GostUtil.UpsertService(inNode.getId(), serviceName, forward.getInPort(), speedId, forward.getRemoteAddr(), tunnel.getType(), tunnel, forward.getStrategy(), interfaceName);
         }
     }
 }

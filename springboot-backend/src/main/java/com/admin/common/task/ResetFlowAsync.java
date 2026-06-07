@@ -6,11 +6,11 @@ import com.admin.entity.Tunnel;
 import com.admin.entity.User;
 import com.admin.entity.UserTunnel;
 import com.admin.service.ForwardService;
+import com.admin.service.FlowSettlementService;
 import com.admin.service.TunnelService;
 import com.admin.service.UserService;
 import com.admin.service.UserTunnelService;
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
-import com.baomidou.mybatisplus.core.conditions.update.UpdateWrapper;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.scheduling.annotation.EnableScheduling;
@@ -31,6 +31,9 @@ public class ResetFlowAsync {
 
     @Resource
     UserTunnelService userTunnelService;
+
+    @Resource
+    FlowSettlementService flowSettlementService;
 
     @Resource
     ForwardService forwardService;
@@ -115,18 +118,14 @@ public class ResetFlowAsync {
             
             log.info("找到{}个需要重置流量的用户", usersToReset.size());
             
-            // 批量重置用户流量 - 使用SQL原子操作避免与到期任务的并发冲突
+            // 批量结算并重置用户流量
             for (User user : usersToReset) {
-                UpdateWrapper<User> updateWrapper = new UpdateWrapper<>();
-                updateWrapper.eq("id", user.getId())
-                           .setSql("in_flow = 0, out_flow = 0"); // 使用SQL原子操作，只更新流量字段
-                
-                boolean success = userService.update(null, updateWrapper);
+                boolean success = flowSettlementService.settleAndResetUser(user, FlowSettlementService.TRIGGER_AUTO);
                 if (success) {
-                    log.info("用户[ID: {}, 用户名: {}]流量重置成功，重置日期: 每月{}号", 
+                    log.info("用户[ID: {}, 用户名: {}]流量结算并重置成功，重置日期: 每月{}号",
                            user.getId(), user.getUser(), user.getFlowResetTime());
                 } else {
-                    log.info("用户[ID: {}, 用户名: {}]流量重置失败", user.getId(), user.getUser());
+                    log.info("用户[ID: {}, 用户名: {}]流量结算并重置失败", user.getId(), user.getUser());
                 }
             }
             
@@ -168,18 +167,14 @@ public class ResetFlowAsync {
             
             log.info("找到{}个需要重置流量的用户隧道", userTunnelsToReset.size());
             
-            // 批量重置用户隧道流量 - 使用SQL原子操作避免与到期任务的并发冲突
+            // 批量结算并重置用户隧道流量
             for (UserTunnel userTunnel : userTunnelsToReset) {
-                UpdateWrapper<UserTunnel> updateWrapper = new UpdateWrapper<>();
-                updateWrapper.eq("id", userTunnel.getId())
-                           .setSql("in_flow = 0, out_flow = 0"); // 使用SQL原子操作，只更新流量字段
-                
-                boolean success = userTunnelService.update(null, updateWrapper);
+                boolean success = flowSettlementService.settleAndResetUserTunnel(userTunnel, FlowSettlementService.TRIGGER_AUTO);
                 if (success) {
-                    log.info("用户隧道[ID: {}, 用户ID: {}, 隧道ID: {}]流量重置成功，重置日期: 每月{}号", 
+                    log.info("用户隧道[ID: {}, 用户ID: {}, 隧道ID: {}]流量结算并重置成功，重置日期: 每月{}号",
                            userTunnel.getId(), userTunnel.getUserId(), userTunnel.getTunnelId(), userTunnel.getFlowResetTime());
                 } else {
-                    log.info("用户隧道[ID: {}, 用户ID: {}, 隧道ID: {}]流量重置失败",
+                    log.info("用户隧道[ID: {}, 用户ID: {}, 隧道ID: {}]流量结算并重置失败",
                             userTunnel.getId(), userTunnel.getUserId(), userTunnel.getTunnelId());
                 }
             }

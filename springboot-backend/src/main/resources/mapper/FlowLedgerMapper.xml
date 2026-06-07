@@ -1,0 +1,84 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.admin.mapper.FlowLedgerMapper">
+
+    <sql id="ledgerFromWhere">
+        FROM flow_ledger fl
+        LEFT JOIN node n ON fl.node_id = n.id
+        LEFT JOIN forward f ON fl.forward_id = f.id
+        LEFT JOIN `user` u ON fl.user_id = u.id
+        LEFT JOIN tunnel t ON fl.tunnel_id = t.id
+        <where>
+            <if test="query.userId != null">
+                AND fl.user_id = #{query.userId}
+            </if>
+            <if test="query.tunnelId != null">
+                AND fl.tunnel_id = #{query.tunnelId}
+            </if>
+            <if test="query.forwardId != null">
+                AND fl.forward_id = #{query.forwardId}
+            </if>
+            <if test="query.nodeId != null">
+                AND fl.node_id = #{query.nodeId}
+            </if>
+            <if test="query.userTunnelId != null">
+                AND fl.user_tunnel_id = #{query.userTunnelId}
+            </if>
+            <if test="query.billingMode != null and query.billingMode != ''">
+                AND fl.billing_mode = #{query.billingMode}
+            </if>
+            <if test="query.serviceName != null and query.serviceName != ''">
+                AND fl.service_name LIKE CONCAT('%', #{query.serviceName}, '%')
+            </if>
+            <if test="query.keyword != null and query.keyword != ''">
+                AND (
+                    fl.service_name LIKE CONCAT('%', #{query.keyword}, '%')
+                    OR u.user LIKE CONCAT('%', #{query.keyword}, '%')
+                    OR t.name LIKE CONCAT('%', #{query.keyword}, '%')
+                    OR f.name LIKE CONCAT('%', #{query.keyword}, '%')
+                    OR n.name LIKE CONCAT('%', #{query.keyword}, '%')
+                )
+            </if>
+            <if test="query.startTime != null">
+                AND fl.created_time &gt;= #{query.startTime}
+            </if>
+            <if test="query.endTime != null">
+                AND fl.created_time &lt;= #{query.endTime}
+            </if>
+        </where>
+    </sql>
+
+    <select id="selectLedgerPage" resultType="com.admin.common.dto.FlowLedgerViewDto">
+        SELECT
+            fl.id,
+            fl.node_id AS nodeId,
+            n.name AS nodeName,
+            fl.forward_id AS forwardId,
+            f.name AS forwardName,
+            fl.user_id AS userId,
+            u.user AS userName,
+            fl.tunnel_id AS tunnelId,
+            t.name AS tunnelName,
+            fl.user_tunnel_id AS userTunnelId,
+            fl.raw_in_flow AS rawInFlow,
+            fl.raw_out_flow AS rawOutFlow,
+            fl.billed_in_flow AS billedInFlow,
+            fl.billed_out_flow AS billedOutFlow,
+            fl.billing_mode AS billingMode,
+            fl.traffic_ratio AS trafficRatio,
+            fl.service_name AS serviceName,
+            fl.created_time AS createdTime
+        <include refid="ledgerFromWhere"/>
+        ORDER BY fl.created_time DESC, fl.id DESC
+    </select>
+
+    <select id="selectLedgerSummary" resultType="com.admin.common.dto.FlowLedgerSummaryDto">
+        SELECT
+            COUNT(1) AS total,
+            COALESCE(SUM(fl.raw_in_flow), 0) AS rawInFlow,
+            COALESCE(SUM(fl.raw_out_flow), 0) AS rawOutFlow,
+            COALESCE(SUM(fl.billed_in_flow), 0) AS billedInFlow,
+            COALESCE(SUM(fl.billed_out_flow), 0) AS billedOutFlow
+        <include refid="ledgerFromWhere"/>
+    </select>
+</mapper>

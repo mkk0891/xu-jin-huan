@@ -12,7 +12,7 @@ import { updateConfigs } from '@/api';
 import { SettingsIcon } from '@/components/icons';
 
 import { isAdmin } from '@/utils/auth';
-import { getCachedConfigs, clearConfigCache, updateSiteConfig } from '@/config/site';
+import { CONFIG_CACHE_PREFIX, getCachedConfigs, clearConfigCache, updateSiteConfig } from '@/config/site';
 
 // 简单的保存图标组件
 const SaveIcon = ({ className }: { className?: string }) => (
@@ -72,30 +72,30 @@ const CONFIG_ITEMS: ConfigItem[] = [
     dependsOn: 'captcha_enabled',
     dependsValue: 'true',
     options: [
-      { 
-        label: '随机类型', 
-        value: 'RANDOM', 
-        description: '系统随机选择验证码类型' 
+      {
+        label: '随机类型',
+        value: 'RANDOM',
+        description: '系统随机选择验证码类型'
       },
-      { 
-        label: '滑块验证码', 
-        value: 'SLIDER', 
-        description: '拖动滑块完成拼图验证' 
+      {
+        label: '滑块验证码',
+        value: 'SLIDER',
+        description: '拖动滑块完成拼图验证'
       },
-      { 
-        label: '文字点选验证码', 
-        value: 'WORD_IMAGE_CLICK', 
-        description: '按顺序点击指定文字' 
+      {
+        label: '文字点选验证码',
+        value: 'WORD_IMAGE_CLICK',
+        description: '按顺序点击指定文字'
       },
-      { 
-        label: '旋转验证码', 
-        value: 'ROTATE', 
-        description: '旋转图片到正确角度' 
+      {
+        label: '旋转验证码',
+        value: 'ROTATE',
+        description: '旋转图片到正确角度'
       },
-      { 
-        label: '拼图验证码', 
-        value: 'CONCAT', 
-        description: '拖动滑块完成图片拼接' 
+      {
+        label: '拼图验证码',
+        value: 'CONCAT',
+        description: '拖动滑块完成图片拼接'
       }
     ]
   }
@@ -104,20 +104,20 @@ const CONFIG_ITEMS: ConfigItem[] = [
 // 初始化时从缓存读取配置，避免闪烁
 const getInitialConfigs = (): Record<string, string> => {
   if (typeof window === 'undefined') return {};
-  
+
   const configKeys = ['app_name', 'captcha_enabled', 'captcha_type', 'ip'];
   const initialConfigs: Record<string, string> = {};
-  
+
   try {
     configKeys.forEach(key => {
-      const cachedValue = localStorage.getItem('vite_config_' + key);
+      const cachedValue = localStorage.getItem(CONFIG_CACHE_PREFIX + key);
       if (cachedValue) {
         initialConfigs[key] = cachedValue;
       }
     });
   } catch (error) {
   }
-  
+
   return initialConfigs;
 };
 
@@ -143,15 +143,15 @@ export default function ConfigPage() {
   const loadConfigs = async (currentConfigs?: Record<string, string>) => {
     const configsToCompare = currentConfigs || configs;
     const hasInitialData = Object.keys(configsToCompare).length > 0;
-    
+
     // 如果已有缓存数据，不显示loading，静默更新
     if (!hasInitialData) {
       setLoading(true);
     }
-    
+
     try {
       const configData = await getCachedConfigs();
-      
+
       // 只有在数据有变化时才更新
       const hasDataChanged = JSON.stringify(configData) !== JSON.stringify(configsToCompare);
       if (hasDataChanged) {
@@ -182,16 +182,16 @@ export default function ConfigPage() {
   // 处理配置项变更
   const handleConfigChange = (key: string, value: string) => {
     let newConfigs = { ...configs, [key]: value };
-    
+
     // 特殊处理：启用验证码时，如果验证码类型未设置，默认为随机
     if (key === 'captcha_enabled' && value === 'true') {
       if (!newConfigs.captcha_type) {
         newConfigs.captcha_type = 'RANDOM';
       }
     }
-    
+
     setConfigs(newConfigs);
-    
+
     // 检查是否有变更
     const hasChangesNow = Object.keys(newConfigs).some(
       k => newConfigs[k] !== originalConfigs[k]
@@ -208,26 +208,26 @@ export default function ConfigPage() {
       const response = await updateConfigs(configs);
       if (response.code === 0) {
         toast.success('配置保存成功');
-        
+
         // 清除所有配置缓存，强制下次重新获取
         clearConfigCache();
-        
+
         // 获取变更的配置项
         const changedKeys = Object.keys(configs).filter(
           key => configs[key] !== originalConfigs[key]
         );
-        
+
         setOriginalConfigs({ ...configs });
         setHasChanges(false);
-        
+
         // 如果应用名称发生变化，立即更新网站配置
         if (changedKeys.includes('app_name')) {
           await updateSiteConfig();
         }
-        
+
         // 触发配置更新事件，通知其他组件
-        window.dispatchEvent(new CustomEvent('configUpdated', { 
-          detail: { changedKeys } 
+        window.dispatchEvent(new CustomEvent('configUpdated', {
+          detail: { changedKeys }
         }));
       } else {
         toast.error('保存配置失败: ' + response.msg);
@@ -252,7 +252,7 @@ export default function ConfigPage() {
   // 渲染不同类型的配置项
   const renderConfigItem = (item: ConfigItem) => {
     const isChanged = hasChanges && configs[item.key] !== originalConfigs[item.key];
-    
+
     switch (item.type) {
       case 'input':
         return (
@@ -264,8 +264,8 @@ export default function ConfigPage() {
             size="md"
             classNames={{
               input: "text-sm",
-              inputWrapper: isChanged 
-                ? "border-warning-300 data-[hover=true]:border-warning-400" 
+              inputWrapper: isChanged
+                ? "border-warning-300 data-[hover=true]:border-warning-400"
                 : ""
             }}
           />
@@ -302,13 +302,13 @@ export default function ConfigPage() {
             variant="bordered"
             size="md"
             classNames={{
-              trigger: isChanged 
-                ? "border-warning-300 data-[hover=true]:border-warning-400" 
+              trigger: isChanged
+                ? "border-warning-300 data-[hover=true]:border-warning-400"
                 : ""
             }}
           >
             {item.options?.map((option) => (
-              <SelectItem 
+              <SelectItem
                 key={option.value}
                 description={option.description}
               >
@@ -325,16 +325,16 @@ export default function ConfigPage() {
 
   if (loading) {
     return (
-      
+
         <div className="flex items-center justify-center min-h-[400px]">
           <Spinner size="lg" label="加载配置中..." />
         </div>
-      
+
     );
   }
 
   return (
-    
+
       <div className="p-6 max-w-4xl mx-auto">
         {/* 页面标题 */}
         <div className="flex items-center gap-3 mb-6">
@@ -396,10 +396,10 @@ export default function ConfigPage() {
                       </p>
                     )}
                   </div>
-                  
+
                   {/* 渲染配置项 */}
                   {renderConfigItem(item)}
-                  
+
                   {/* 分隔线 */}
                   {!isLastItem && (
                     <Divider className="mt-6" />
@@ -424,6 +424,6 @@ export default function ConfigPage() {
           </Card>
         )}
       </div>
-    
+
   );
-} 
+}

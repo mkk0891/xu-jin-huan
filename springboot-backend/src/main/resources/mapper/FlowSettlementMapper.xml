@@ -1,0 +1,71 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.admin.mapper.FlowSettlementMapper">
+
+    <sql id="settlementWhere">
+        FROM flow_settlement fs
+        <where>
+            <if test="query.scope != null and query.scope != ''">
+                AND fs.scope = #{query.scope}
+            </if>
+            <if test="query.triggerType != null and query.triggerType != ''">
+                AND fs.trigger_type = #{query.triggerType}
+            </if>
+            <if test="query.userId != null">
+                AND fs.user_id = #{query.userId}
+            </if>
+            <if test="query.tunnelId != null">
+                AND fs.tunnel_id = #{query.tunnelId}
+            </if>
+            <if test="query.userTunnelId != null">
+                AND fs.user_tunnel_id = #{query.userTunnelId}
+            </if>
+            <if test="query.keyword != null and query.keyword != ''">
+                AND (
+                    fs.user_name LIKE CONCAT('%', #{query.keyword}, '%')
+                    OR fs.tunnel_name LIKE CONCAT('%', #{query.keyword}, '%')
+                    OR fs.period_key LIKE CONCAT('%', #{query.keyword}, '%')
+                )
+            </if>
+            <if test="query.startTime != null">
+                AND fs.settled_time &gt;= #{query.startTime}
+            </if>
+            <if test="query.endTime != null">
+                AND fs.settled_time &lt;= #{query.endTime}
+            </if>
+        </where>
+    </sql>
+
+    <select id="selectSettlementPage" resultType="com.admin.common.dto.FlowSettlementViewDto">
+        SELECT
+            fs.id,
+            fs.scope,
+            fs.target_id AS targetId,
+            fs.user_id AS userId,
+            fs.user_name AS userName,
+            fs.tunnel_id AS tunnelId,
+            fs.tunnel_name AS tunnelName,
+            fs.user_tunnel_id AS userTunnelId,
+            fs.trigger_type AS triggerType,
+            fs.in_flow AS inFlow,
+            fs.out_flow AS outFlow,
+            fs.total_flow AS totalFlow,
+            fs.flow_limit AS flowLimit,
+            fs.forward_limit AS forwardLimit,
+            fs.reset_day AS resetDay,
+            fs.period_key AS periodKey,
+            fs.settled_time AS settledTime,
+            fs.created_time AS createdTime
+        <include refid="settlementWhere"/>
+        ORDER BY fs.settled_time DESC, fs.id DESC
+    </select>
+
+    <select id="selectSettlementSummary" resultType="com.admin.common.dto.FlowSettlementSummaryDto">
+        SELECT
+            COUNT(1) AS total,
+            COALESCE(SUM(fs.in_flow), 0) AS inFlow,
+            COALESCE(SUM(fs.out_flow), 0) AS outFlow,
+            COALESCE(SUM(fs.total_flow), 0) AS totalFlow
+        <include refid="settlementWhere"/>
+    </select>
+</mapper>

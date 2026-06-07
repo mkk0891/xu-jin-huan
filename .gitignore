@@ -2,6 +2,10 @@
 # 操作系统生成的文件
 # ==========================================
 flutter_app/
+.tools/
+.deploy/
+backend-admin.jar
+frontend-dist.tar.gz
 
 # macOS
 .DS_Store

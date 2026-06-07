@@ -39,7 +39,6 @@ public class ForwardServiceImpl extends ServiceImpl<ForwardMapper, Forward> impl
 
     // 常量定义
     private static final String GOST_SUCCESS_MSG = "OK";
-    private static final String GOST_NOT_FOUND_MSG = "not found";
     private static final int ADMIN_ROLE_ID = 0;
     private static final int TUNNEL_TYPE_PORT_FORWARD = 1;
     private static final int TUNNEL_TYPE_TUNNEL_FORWARD = 2;
@@ -1193,10 +1192,7 @@ public class ForwardServiceImpl extends ServiceImpl<ForwardMapper, Forward> impl
         if (outIp.contains(":")) {
             remoteAddr = "[" + outIp + "]:" + outPort;
         }
-        GostDto createResult = GostUtil.UpdateChains(inNode.getId(), serviceName, remoteAddr, protocol, interfaceName);
-        if (createResult.getMsg().contains(GOST_NOT_FOUND_MSG)) {
-            createResult = GostUtil.AddChains(inNode.getId(), serviceName, remoteAddr, protocol, interfaceName);
-        }
+        GostDto createResult = GostUtil.UpsertChains(inNode.getId(), serviceName, remoteAddr, protocol, interfaceName);
         return isGostOperationSuccess(createResult) ? R.ok() : R.err(createResult.getMsg());
     }
 
@@ -1205,10 +1201,7 @@ public class ForwardServiceImpl extends ServiceImpl<ForwardMapper, Forward> impl
      */
     private R updateRemoteService(Node outNode, String serviceName, Forward forward, String protocol, String interfaceName) {
         // 创建新远程服务
-        GostDto createResult = GostUtil.UpdateRemoteService(outNode.getId(), serviceName, forward.getOutPort(), forward.getRemoteAddr(), protocol, forward.getStrategy(), interfaceName);
-        if (createResult.getMsg().contains(GOST_NOT_FOUND_MSG)) {
-            createResult = GostUtil.AddRemoteService(outNode.getId(), serviceName, forward.getOutPort(), forward.getRemoteAddr(), protocol, forward.getStrategy(), interfaceName);
-        }
+        GostDto createResult = GostUtil.UpsertRemoteService(outNode.getId(), serviceName, forward.getOutPort(), forward.getRemoteAddr(), protocol, forward.getStrategy(), interfaceName);
         return isGostOperationSuccess(createResult) ? R.ok() : R.err(createResult.getMsg());
     }
 
@@ -1216,11 +1209,7 @@ public class ForwardServiceImpl extends ServiceImpl<ForwardMapper, Forward> impl
      * 更新主服务
      */
     private R updateMainService(Node inNode, String serviceName, Forward forward, Integer limiter, Integer tunnelType, Tunnel tunnel, String strategy, String interfaceName) {
-        GostDto result = GostUtil.UpdateService(inNode.getId(), serviceName, forward.getInPort(), limiter, forward.getRemoteAddr(), tunnelType, tunnel, strategy, interfaceName);
-
-        if (result.getMsg().contains(GOST_NOT_FOUND_MSG)) {
-            result = GostUtil.AddService(inNode.getId(), serviceName, forward.getInPort(), limiter, forward.getRemoteAddr(), tunnelType, tunnel, strategy, interfaceName);
-        }
+        GostDto result = GostUtil.UpsertService(inNode.getId(), serviceName, forward.getInPort(), limiter, forward.getRemoteAddr(), tunnelType, tunnel, strategy, interfaceName);
 
         return isGostOperationSuccess(result) ? R.ok() : R.err(result.getMsg());
     }

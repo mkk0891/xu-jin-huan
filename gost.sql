@@ -104,13 +104,64 @@ CREATE TABLE `statistics_flow` (
 -- --------------------------------------------------------
 
 --
+-- 表的结构 `flow_ledger`
+--
+
+CREATE TABLE `flow_ledger` (
+  `id` bigint(20) NOT NULL,
+  `node_id` bigint(20) DEFAULT NULL,
+  `forward_id` bigint(20) DEFAULT NULL,
+  `user_id` int(10) DEFAULT NULL,
+  `tunnel_id` int(10) DEFAULT NULL,
+  `user_tunnel_id` int(10) DEFAULT NULL,
+  `raw_in_flow` bigint(20) NOT NULL DEFAULT '0',
+  `raw_out_flow` bigint(20) NOT NULL DEFAULT '0',
+  `billed_in_flow` bigint(20) NOT NULL DEFAULT '0',
+  `billed_out_flow` bigint(20) NOT NULL DEFAULT '0',
+  `billing_mode` varchar(32) NOT NULL DEFAULT 'LEGACY',
+  `traffic_ratio` decimal(10,2) NOT NULL DEFAULT '1.00',
+  `service_name` varchar(128) DEFAULT NULL,
+  `created_time` bigint(20) NOT NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- --------------------------------------------------------
+
+--
+-- 表的结构 `flow_settlement`
+--
+
+CREATE TABLE `flow_settlement` (
+  `id` bigint(20) NOT NULL,
+  `scope` varchar(32) NOT NULL,
+  `target_id` bigint(20) NOT NULL,
+  `user_id` bigint(20) DEFAULT NULL,
+  `user_name` varchar(100) DEFAULT NULL,
+  `tunnel_id` int(10) DEFAULT NULL,
+  `tunnel_name` varchar(100) DEFAULT NULL,
+  `user_tunnel_id` int(10) DEFAULT NULL,
+  `trigger_type` varchar(32) NOT NULL,
+  `in_flow` bigint(20) NOT NULL DEFAULT '0',
+  `out_flow` bigint(20) NOT NULL DEFAULT '0',
+  `total_flow` bigint(20) NOT NULL DEFAULT '0',
+  `flow_limit` bigint(20) DEFAULT NULL,
+  `forward_limit` int(10) DEFAULT NULL,
+  `reset_day` bigint(20) DEFAULT NULL,
+  `period_key` varchar(16) NOT NULL,
+  `settled_time` bigint(20) NOT NULL,
+  `created_time` bigint(20) NOT NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- --------------------------------------------------------
+
+--
 -- 表的结构 `tunnel`
 --
 
 CREATE TABLE `tunnel` (
   `id` int(10) NOT NULL,
   `name` varchar(100) NOT NULL,
-  `traffic_ratio` decimal(10,1) NOT NULL DEFAULT '1.0',
+  `traffic_ratio` decimal(10,2) NOT NULL DEFAULT '1.00',
+  `billing_mode` varchar(32) NOT NULL DEFAULT 'LEGACY',
   `in_node_id` int(10) NOT NULL,
   `in_ip` varchar(100) NOT NULL,
   `out_node_id` int(10) NOT NULL,
@@ -166,6 +217,8 @@ CREATE TABLE `user_tunnel` (
   `user_id` int(10) NOT NULL,
   `tunnel_id` int(10) NOT NULL,
   `speed_id` int(10) DEFAULT NULL,
+  `billing_mode` varchar(32) DEFAULT NULL,
+  `traffic_ratio` decimal(10,2) DEFAULT NULL,
   `num` int(10) NOT NULL,
   `flow` bigint(20) NOT NULL,
   `in_flow` bigint(20) NOT NULL DEFAULT '0',
@@ -193,7 +246,7 @@ CREATE TABLE `vite_config` (
 --
 
 INSERT INTO `vite_config` (`id`, `name`, `value`, `time`) VALUES
-(1, 'app_name', 'flux', 1755147963000);
+(1, 'app_name', '须尽欢', 1755147963000);
 
 --
 -- 转储表的索引
@@ -224,6 +277,24 @@ ALTER TABLE `statistics_flow`
   ADD PRIMARY KEY (`id`);
 
 --
+-- 表的索引 `flow_ledger`
+--
+ALTER TABLE `flow_ledger`
+  ADD PRIMARY KEY (`id`),
+  ADD KEY `idx_flow_ledger_user_time` (`user_id`,`created_time`),
+  ADD KEY `idx_flow_ledger_forward_time` (`forward_id`,`created_time`),
+  ADD KEY `idx_flow_ledger_tunnel_time` (`tunnel_id`,`created_time`);
+
+--
+-- 表的索引 `flow_settlement`
+--
+ALTER TABLE `flow_settlement`
+  ADD PRIMARY KEY (`id`),
+  ADD KEY `idx_flow_settlement_scope_time` (`scope`,`settled_time`),
+  ADD KEY `idx_flow_settlement_user_time` (`user_id`,`settled_time`),
+  ADD KEY `idx_flow_settlement_tunnel_time` (`tunnel_id`,`settled_time`);
+
+--
 -- 表的索引 `tunnel`
 --
 ALTER TABLE `tunnel`
@@ -239,7 +310,8 @@ ALTER TABLE `user`
 -- 表的索引 `user_tunnel`
 --
 ALTER TABLE `user_tunnel`
-  ADD PRIMARY KEY (`id`);
+  ADD PRIMARY KEY (`id`),
+  ADD UNIQUE KEY `uk_user_tunnel` (`user_id`,`tunnel_id`);
 
 --
 -- 表的索引 `vite_config`
@@ -275,6 +347,18 @@ ALTER TABLE `speed_limit`
 --
 ALTER TABLE `statistics_flow`
   MODIFY `id` int(10) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=1;
+
+--
+-- 使用表AUTO_INCREMENT `flow_ledger`
+--
+ALTER TABLE `flow_ledger`
+  MODIFY `id` bigint(20) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=1;
+
+--
+-- 使用表AUTO_INCREMENT `flow_settlement`
+--
+ALTER TABLE `flow_settlement`
+  MODIFY `id` bigint(20) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=1;
 
 --
 -- 使用表AUTO_INCREMENT `tunnel`

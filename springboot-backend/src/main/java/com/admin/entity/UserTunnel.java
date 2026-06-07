@@ -1,6 +1,7 @@
 package com.admin.entity;
 
 import java.io.Serializable;
+import java.math.BigDecimal;
 
 import com.baomidou.mybatisplus.annotation.FieldStrategy;
 import com.baomidou.mybatisplus.annotation.TableField;
@@ -49,5 +50,9 @@ public class UserTunnel implements Serializable {
     private Integer num;
 
     private Integer status;
+
+    private String billingMode;
+
+    private BigDecimal trafficRatio;
 
 }

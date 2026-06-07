@@ -1,13 +1,18 @@
 package com.admin.controller;
 
 import com.admin.common.aop.LogAnnotation;
+import com.admin.common.billing.BillingCalculator;
+import com.admin.common.billing.BillingResult;
 import com.admin.common.dto.FlowDto;
 import com.admin.common.dto.GostConfigDto;
 import com.admin.common.lang.R;
+import com.admin.common.permission.PermissionCheckResult;
 import com.admin.common.task.CheckGostConfigAsync;
 import com.admin.common.utils.AESCrypto;
 import com.admin.common.utils.GostUtil;
 import com.admin.entity.*;
+import com.admin.service.FlowLedgerService;
+import com.admin.service.PermissionPolicyService;
 import com.alibaba.fastjson.JSON;
 import com.alibaba.fastjson.JSONObject;
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
@@ -16,12 +21,9 @@ import org.springframework.web.bind.annotation.*;
 import lombok.extern.slf4j.Slf4j;
 
 import javax.annotation.Resource;
-import java.math.BigDecimal;
-import java.util.Date;
 import java.util.List;
 import java.util.Objects;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.stream.Collectors;
 
 /**
  * 流量上报控制器
@@ -52,7 +54,6 @@ public class FlowController extends BaseController {
     // 常量定义
     private static final String SUCCESS_RESPONSE = "ok";
     private static final String DEFAULT_USER_TUNNEL_ID = "0";
-    private static final long BYTES_TO_GB = 1024L * 1024L * 1024L;
 
     // 用于同步相同用户和隧道的流量更新操作
     private static final ConcurrentHashMap<String, Object> USER_LOCKS = new ConcurrentHashMap<>();
@@ -64,6 +65,15 @@ public class FlowController extends BaseController {
 
     @Resource
     CheckGostConfigAsync checkGostConfigAsync;
+
+    @Resource
+    BillingCalculator billingCalculator;
+
+    @Resource
+    FlowLedgerService flowLedgerService;
+
+    @Resource
+    PermissionPolicyService permissionPolicyService;
 
     /**
      * 加密消息包装器
@@ -139,7 +149,8 @@ public class FlowController extends BaseController {
     @LogAnnotation
     public String uploadFlowData(@RequestBody String rawData, String secret) {
         // 1. 验证节点权限
-        if (!isValidNode(secret)) {
+        Node node = getNodeBySecret(secret);
+        if (node == null) {
             return SUCCESS_RESPONSE;
         }
 
@@ -155,7 +166,7 @@ public class FlowController extends BaseController {
         // 记录日志
         log.info("节点上报流量数据{}", flowDataList);
         // 4. 处理流量数据
-        return processFlowData(flowDataList);
+        return processFlowData(flowDataList, node.getId());
     }
 
     /**
@@ -212,24 +223,32 @@ public class FlowController extends BaseController {
     /**
      * 处理流量数据的核心逻辑
      */
-    private String processFlowData(FlowDto flowDataList) {
+    private String processFlowData(FlowDto flowDataList, Long nodeId) {
         String[] serviceIds = parseServiceName(flowDataList.getN());
+        if (serviceIds.length < 3) {
+            log.warn("忽略无法解析的流量上报服务名: {}", flowDataList.getN());
+            return SUCCESS_RESPONSE;
+        }
+
         String forwardId = serviceIds[0];
         String userId = serviceIds[1];
         String userTunnelId = serviceIds[2];
 
         Forward forward = forwardService.getById(forwardId);
+        Tunnel tunnel = forward == null ? null : tunnelService.getById(forward.getTunnelId());
+        UserTunnel userTunnel = Objects.equals(userTunnelId, DEFAULT_USER_TUNNEL_ID) ? null : userTunnelService.getById(userTunnelId);
 
-        // 获取流量计费类型
-        int flowType = getFlowType(forward);
-
-        //  处理流量倍率及单双向计算
-        FlowDto flowStats = filterFlowData(flowDataList, forward, flowType);
+        BillingResult billingResult = billingCalculator.calculate(flowDataList, tunnel, userTunnel);
+        FlowDto flowStats = new FlowDto();
+        flowStats.setD(billingResult.getInFlow());
+        flowStats.setU(billingResult.getOutFlow());
 
         // 先更新所有流量统计 - 确保流量数据的一致性
         updateForwardFlow(forwardId, flowStats);
         updateUserFlow(userId, flowStats);
         updateUserTunnelFlow(userTunnelId, flowStats);
+
+        recordFlowLedger(nodeId, flowDataList, billingResult, forward, tunnel, userTunnel, forwardId, userId, userTunnelId);
 
         // 7. 检查和服务暂停操作
         String name = buildServiceName(forwardId, userId, userTunnelId);
@@ -241,28 +260,39 @@ public class FlowController extends BaseController {
         return SUCCESS_RESPONSE;
     }
 
+    private void recordFlowLedger(Long nodeId, FlowDto rawFlow, BillingResult billingResult, Forward forward,
+                                  Tunnel tunnel, UserTunnel userTunnel, String forwardId, String userId,
+                                  String userTunnelId) {
+        try {
+            FlowLedger ledger = new FlowLedger();
+            ledger.setNodeId(nodeId);
+            ledger.setForwardId(parseLong(forwardId));
+            ledger.setUserId(parseInteger(userId));
+            ledger.setTunnelId(forward == null ? (tunnel == null ? null : tunnel.getId().intValue()) : forward.getTunnelId());
+            ledger.setUserTunnelId(Objects.equals(userTunnelId, DEFAULT_USER_TUNNEL_ID) ? null : parseInteger(userTunnelId));
+            ledger.setRawInFlow(safe(rawFlow.getD()));
+            ledger.setRawOutFlow(safe(rawFlow.getU()));
+            ledger.setBilledInFlow(billingResult.getInFlow());
+            ledger.setBilledOutFlow(billingResult.getOutFlow());
+            ledger.setBillingMode(billingResult.getBillingMode().name());
+            ledger.setTrafficRatio(billingResult.getTrafficRatio());
+            ledger.setServiceName(rawFlow.getN());
+            ledger.setCreatedTime(System.currentTimeMillis());
+            flowLedgerService.save(ledger);
+        } catch (Exception e) {
+            log.warn("记录流量账本失败，服务名: {}, 错误: {}", rawFlow.getN(), e.getMessage());
+        }
+    }
+
     private void checkUserRelatedLimits(String userId, String name) {
 
         // 重新查询用户以获取最新的流量数据
         User updatedUser = userService.getById(userId);
         if (updatedUser == null) return;
 
-        // 检查用户总流量限制
-        long userFlowLimit = updatedUser.getFlow() * BYTES_TO_GB;
-        long userCurrentFlow = updatedUser.getInFlow() + updatedUser.getOutFlow();
-        if (userFlowLimit < userCurrentFlow) {
-            pauseAllUserServices(userId, name);
-            return;
-        }
-
-        // 检查用户到期时间
-        if (updatedUser.getExpTime() != null && updatedUser.getExpTime() <= new Date().getTime()) {
-            pauseAllUserServices(userId, name);
-            return;
-        }
-
-        // 检查用户状态
-        if (updatedUser.getStatus() != 1) {
+        PermissionCheckResult checkResult = permissionPolicyService.checkUserRuntime(updatedUser);
+        if (!checkResult.isAllowed()) {
+            log.info("用户 {} 触发运行权限限制: {}", userId, checkResult.getReason());
             pauseAllUserServices(userId, name);
         }
     }
@@ -276,22 +306,12 @@ public class FlowController extends BaseController {
 
         UserTunnel userTunnel = userTunnelService.getById(userTunnelId);
         if (userTunnel == null) return;
-        long flow = userTunnel.getInFlow() + userTunnel.getOutFlow();
-        if (flow >= userTunnel.getFlow() *  BYTES_TO_GB) {
-            pauseSpecificForward(userTunnel.getTunnelId(), name, userId);
-            return;
-        }
 
-        if (userTunnel.getExpTime() != null && userTunnel.getExpTime() <= System.currentTimeMillis()) {
-            pauseSpecificForward(userTunnel.getTunnelId(), name, userId);
-            return;
-        }
-
-        if (userTunnel.getStatus() != 1) {
+        PermissionCheckResult checkResult = permissionPolicyService.checkUserTunnelRuntime(userTunnel);
+        if (!checkResult.isAllowed()) {
+            log.info("用户 {} 隧道权限 {} 触发运行限制: {}", userId, userTunnelId, checkResult.getReason());
             pauseSpecificForward(userTunnel.getTunnelId(), name, userId);
         }
-
-
     }
 
     private void pauseSpecificForward(Integer tunnelId, String name, String userId) {
@@ -311,33 +331,6 @@ public class FlowController extends BaseController {
             forward.setStatus(0);
             forwardService.updateById(forward);
         }
-    }
-
-    private FlowDto filterFlowData(FlowDto flowDto, Forward forward, int flowType) {
-        if (forward != null) {
-            Tunnel tunnel = tunnelService.getById(forward.getTunnelId());
-            if (tunnel != null) {
-                BigDecimal trafficRatio = tunnel.getTrafficRatio();
-
-                BigDecimal originalD = BigDecimal.valueOf(flowDto.getD());
-                BigDecimal originalU = BigDecimal.valueOf(flowDto.getU());
-
-                BigDecimal newD = originalD.multiply(trafficRatio);
-                BigDecimal newU = originalU.multiply(trafficRatio);
-
-                flowDto.setD(newD.longValue() * flowType);
-                flowDto.setU(newU.longValue() * flowType);
-            }
-        }
-        return flowDto;
-    }
-
-    private int getFlowType(Forward forward) {
-        int defaultFlowType = 2;
-        if (forward == null) return defaultFlowType;
-        Tunnel tunnel = tunnelService.getById(forward.getTunnelId());
-        if (tunnel == null) return defaultFlowType;
-        return tunnel.getFlow();
     }
 
     private void updateForwardFlow(String forwardId, FlowDto flowStats) {
@@ -392,9 +385,8 @@ public class FlowController extends BaseController {
         return FORWARD_LOCKS.computeIfAbsent(forwardId, k -> new Object());
     }
 
-    private boolean isValidNode(String secret) {
-        int nodeCount = nodeService.count(new QueryWrapper<Node>().eq("secret", secret));
-        return nodeCount > 0;
+    private Node getNodeBySecret(String secret) {
+        return nodeService.getOne(new QueryWrapper<Node>().eq("secret", secret));
     }
 
     private String[] parseServiceName(String serviceName) {
@@ -403,5 +395,25 @@ public class FlowController extends BaseController {
 
     private String buildServiceName(String forwardId, String userId, String userTunnelId) {
         return forwardId + "_" + userId + "_" + userTunnelId;
+    }
+
+    private long safe(Long value) {
+        return value == null ? 0L : value;
+    }
+
+    private Long parseLong(String value) {
+        try {
+            return Long.valueOf(value);
+        } catch (Exception e) {
+            return null;
+        }
+    }
+
+    private Integer parseInteger(String value) {
+        try {
+            return Integer.valueOf(value);
+        } catch (Exception e) {
+            return null;
+        }
     }
 }

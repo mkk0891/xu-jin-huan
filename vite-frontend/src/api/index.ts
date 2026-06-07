@@ -1,6 +1,14 @@
 import Network from './network';
+import type {
+  FlowLedgerPage,
+  FlowLedgerQuery,
+  FlowLedgerSummary,
+  FlowSettlementPage,
+  FlowSettlementQuery,
+  FlowSettlementSummary
+} from '@/types';
 
-// 登陆相关接口
+// 登录相关接口
 export interface LoginData {
   username: string;
   password: string;
@@ -21,7 +29,7 @@ export const createUser = (data: any) => Network.post("/user/create", data);
 export const getAllUsers = (pageData: any = {}) => Network.post("/user/list", pageData);
 export const updateUser = (data: any) => Network.post("/user/update", data);
 export const deleteUser = (id: number) => Network.post("/user/delete", { id });
-export const getUserPackageInfo = () => Network.post("/user/package");
+export const getUserPermissionInfo = () => Network.post("/user/permission");
 
 // 节点CRUD操作 - 全部使用POST请求
 export const createNode = (data: any) => Network.post("/node/create", data);
@@ -78,6 +86,14 @@ export const updatePassword = (data: any) => Network.post("/user/updatePassword"
 // 重置流量接口
 export const resetUserFlow = (data: { id: number; type: number }) => Network.post("/user/reset", data);
 
+// 流量账本接口
+export const getFlowLedgerList = (data: FlowLedgerQuery = {}) => Network.post<FlowLedgerPage>("/flow-ledger/list", data);
+export const getFlowLedgerSummary = (data: FlowLedgerQuery = {}) => Network.post<FlowLedgerSummary>("/flow-ledger/summary", data);
+
+// 周期结算接口
+export const getFlowSettlementList = (data: FlowSettlementQuery = {}) => Network.post<FlowSettlementPage>("/flow-settlement/list", data);
+export const getFlowSettlementSummary = (data: FlowSettlementQuery = {}) => Network.post<FlowSettlementSummary>("/flow-settlement/summary", data);
+
 // 网站配置相关接口
 export const getConfigs = () => Network.post("/config/list");
 export const getConfigByName = (name: string) => Network.post("/config/get", { name });
@@ -88,4 +104,4 @@ export const updateConfig = (name: string, value: string) => Network.post("/conf
 // 验证码相关接口
 export const checkCaptcha = () => Network.post("/captcha/check");
 export const generateCaptcha = () => Network.post(`/captcha/generate`);
-export const verifyCaptcha = (data: { captchaId: string; trackData: string }) => Network.post("/captcha/verify", data); 
+export const verifyCaptcha = (data: { captchaId: string; trackData: string }) => Network.post("/captcha/verify", data);
