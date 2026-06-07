@@ -10,6 +10,11 @@ import java.util.Objects;
 
 public class GostUtil {
 
+    private static final String UDP_SESSION_TTL = "120s";
+    private static final int UDP_READ_BUFFER_SIZE = 65535;
+    private static final int UDP_READ_QUEUE_SIZE = 512;
+    private static final int UDP_BACKLOG = 512;
+
 
     public static GostDto AddLimiters(Long node_id, Long name, String speed) {
         JSONObject data = buildLimiterConfig(name, speed);
@@ -298,11 +303,19 @@ public class GostUtil {
         JSONObject listener = new JSONObject();
         listener.put("type", protocol);
         if (Objects.equals(protocol, "udp")){
-            JSONObject metadata = new JSONObject();
-            metadata.put("keepAlive", true);
-            listener.put("metadata", metadata);
+            listener.put("metadata", createUdpListenerMetadata());
         }
         return listener;
+    }
+
+    private static JSONObject createUdpListenerMetadata() {
+        JSONObject metadata = new JSONObject();
+        metadata.put("keepalive", true);
+        metadata.put("ttl", UDP_SESSION_TTL);
+        metadata.put("readBufferSize", UDP_READ_BUFFER_SIZE);
+        metadata.put("readQueueSize", UDP_READ_QUEUE_SIZE);
+        metadata.put("backlog", UDP_BACKLOG);
+        return metadata;
     }
 
     private static JSONObject createForwarder(String remoteAddr, String strategy) {
