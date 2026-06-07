@@ -305,9 +305,9 @@ export default function IndexPage() {
 
       {/* 版权信息 - 固定在底部，不占据布局空间 */}
       
-               <div className="fixed inset-x-0 bottom-4 text-center py-4">
-               <p className="text-xs text-gray-400 dark:text-gray-500">
-                 {siteConfig.name}
+               <div className="fixed inset-x-0 bottom-4 text-center py-4 px-6">
+               <p className="text-xs leading-relaxed text-gray-400 dark:text-gray-500">
+                 {siteConfig.footerText}
                </p>
                <p className="text-xs text-gray-400 dark:text-gray-500 mt-1">
                  v{ isWebView ? siteConfig.app_version : siteConfig.version}

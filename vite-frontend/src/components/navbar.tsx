@@ -67,14 +67,19 @@ export const Navbar = () => {
       <HeroUINavbar maxWidth="xl" position="sticky" height="60px" className="shrink-0">
         <NavbarContent className="basis-1/5 sm:basis-full" justify="start">
           <NavbarBrand className="gap-2 max-w-fit">
-            <Link
-              className="flex justify-start items-center gap-2 max-w-[200px] sm:max-w-none"
+            <div className="flex justify-start items-center gap-2 max-w-[200px] sm:max-w-none">
+              <Link
+              className="text-foreground hover:text-primary transition-colors"
               color="foreground"
-              href="/"
+                href={siteConfig.githubUrl}
+                rel="noopener noreferrer"
+                target="_blank"
+                title="打开 GitHub 项目"
             >
               <Logo size={24} />
+              </Link>
               <p className="font-bold text-inherit truncate">{appName}</p>
-            </Link>
+            </div>
           </NavbarBrand>
         </NavbarContent>
 

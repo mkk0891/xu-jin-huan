@@ -246,7 +246,7 @@ CREATE TABLE `vite_config` (
 --
 
 INSERT INTO `vite_config` (`id`, `name`, `value`, `time`) VALUES
-(1, 'app_name', '须尽欢', 1755147963000);
+(1, 'app_name', '须尽欢转发', 1755147963000);
 
 --
 -- 转储表的索引

@@ -3,16 +3,21 @@ import { getConfigByName, getConfigs } from '@/api';
 export type SiteConfig = typeof siteConfig;
 
 // 缓存相关常量
-export const CONFIG_CACHE_PREFIX = 'xu_jin_huan_config_';
-const VERSION = "1.4.3";
+export const CONFIG_CACHE_PREFIX = 'xu_jin_huan_config_v2_';
+const DEFAULT_APP_NAME = "须尽欢转发";
+const VERSION = "1.4.4";
 const APP_VERSION = "1.0.3";
+const FOOTER_TEXT = "所有失去的，都会以另一种方式归来...";
+const GITHUB_URL = "https://github.com/mkk0891/xu-jin-huan";
 
 const getInitialConfig = () => {
   if (typeof window === 'undefined') {
     return {
-      name: "须尽欢",
+      name: DEFAULT_APP_NAME,
       version: VERSION,
       app_version: APP_VERSION,
+      footerText: FOOTER_TEXT,
+      githubUrl: GITHUB_URL,
     };
   }
 
@@ -22,12 +27,16 @@ const getInitialConfig = () => {
         name: cachedAppName,
         version: VERSION,
         app_version: APP_VERSION,
+        footerText: FOOTER_TEXT,
+        githubUrl: GITHUB_URL,
       };
     }
   return {
-    name: "须尽欢",
+    name: DEFAULT_APP_NAME,
     version: VERSION,
     app_version: APP_VERSION,
+    footerText: FOOTER_TEXT,
+    githubUrl: GITHUB_URL,
   };
 };
 

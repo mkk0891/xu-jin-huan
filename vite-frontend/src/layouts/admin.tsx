@@ -288,7 +288,15 @@ export default function AdminLayout({
                  {/* Logo 区域 */}
          <div className="px-3 py-3 h-14 flex items-center">
            <div className="flex items-center gap-2 w-full">
-             <Logo size={24} />
+             <a
+               className="text-foreground hover:text-primary transition-colors flex-shrink-0"
+               href={siteConfig.githubUrl}
+               rel="noopener noreferrer"
+               target="_blank"
+               title="打开 GitHub 项目"
+             >
+               <Logo size={24} />
+             </a>
              <div className="flex-1 min-w-0">
                <h1 className="text-sm font-bold text-foreground overflow-hidden whitespace-nowrap">{siteConfig.name}</h1>
                <p className="text-xs text-default-500">v{siteConfig.version}</p>
@@ -329,7 +337,7 @@ export default function AdminLayout({
         <div className="px-4 py-2 pb-4 mt-auto flex-shrink-0">
           <div className="text-center">
             <p className="text-xs text-gray-400 dark:text-gray-500">
-              {siteConfig.name}
+              {siteConfig.footerText}
             </p>
           </div>
         </div>

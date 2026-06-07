@@ -260,9 +260,9 @@ export default function ProfilePage() {
           </CardBody>
         </Card>
 
-        <div className="fixed inset-x-0 bottom-20 text-center py-4">
-               <p className="text-xs text-gray-400 dark:text-gray-500">
-                 {siteConfig.name}
+        <div className="fixed inset-x-0 bottom-20 text-center py-4 px-6">
+               <p className="text-xs leading-relaxed text-gray-400 dark:text-gray-500">
+                 {siteConfig.footerText}
                </p>
                <p className="text-xs text-gray-400 dark:text-gray-500 mt-1">
                  v{ isWebViewFunc() ? siteConfig.app_version : siteConfig.version}
