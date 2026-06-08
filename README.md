@@ -16,7 +16,7 @@
 面板默认前端对外端口为 `7777`，后端对外端口为 `6666`，默认不占用 `80/443`。
 
 ```bash
-curl -L https://flux.mkk01.dpdns.org/panel_install.sh -o panel_install.sh && chmod +x panel_install.sh && ./panel_install.sh
+curl -L https://raw.githubusercontent.com/mkk0891/xu-jin-huan/main/panel_install.sh -o panel_install.sh && chmod +x panel_install.sh && ./panel_install.sh
 ```
 
 节点安装命令建议在后台“节点监控”里复制，系统会自动带上面板地址和节点密钥。

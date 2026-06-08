@@ -8,9 +8,10 @@ export LC_ALL=C
 
 
 # 全局下载地址配置
-DOCKER_COMPOSEV4_URL="https://github.com/bqlpfy/flux-panel/releases/download/1.4.3/docker-compose-v4.yml"
-DOCKER_COMPOSEV6_URL="https://github.com/bqlpfy/flux-panel/releases/download/1.4.3/docker-compose-v6.yml"
-GOST_SQL_URL="https://github.com/bqlpfy/flux-panel/releases/download/1.4.3/gost.sql"
+PROJECT_RAW_BASE="https://raw.githubusercontent.com/mkk0891/xu-jin-huan/main"
+DOCKER_COMPOSEV4_URL="$PROJECT_RAW_BASE/docker-compose-v4.yml"
+DOCKER_COMPOSEV6_URL="$PROJECT_RAW_BASE/docker-compose-v6.yml"
+GOST_SQL_URL="$PROJECT_RAW_BASE/gost.sql"
 
 COUNTRY=$(curl -s https://ipinfo.io/country)
 if [ "$COUNTRY" = "CN" ]; then
