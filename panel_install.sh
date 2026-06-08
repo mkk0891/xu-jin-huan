@@ -175,8 +175,8 @@ get_config_params() {
 
 
 
-  read -p "前端端口（默认 6366）: " FRONTEND_PORT
-  FRONTEND_PORT=${FRONTEND_PORT:-6366}
+  read -p "前端端口（默认 7777）: " FRONTEND_PORT
+  FRONTEND_PORT=${FRONTEND_PORT:-7777}
 
   read -p "后端端口（默认 6666）: " BACKEND_PORT
   BACKEND_PORT=${BACKEND_PORT:-6666}

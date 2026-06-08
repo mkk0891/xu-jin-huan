@@ -13,7 +13,7 @@
 
 ## 快速部署
 
-面板默认后端对外端口为 `6666`，前端端口由部署脚本配置。
+面板默认前端对外端口为 `7777`，后端对外端口为 `6666`，默认不占用 `80/443`。
 
 ```bash
 curl -L https://flux.mkk01.dpdns.org/panel_install.sh -o panel_install.sh && chmod +x panel_install.sh && ./panel_install.sh
