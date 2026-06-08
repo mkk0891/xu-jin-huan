@@ -16,8 +16,8 @@ services:
       --default-authentication-plugin=mysql_native_password
       --character-set-server=utf8mb4
       --collation-server=utf8mb4_unicode_ci
-      --max_connections=1000
-      --innodb_buffer_pool_size=256M
+      --max_connections=200
+      --innodb_buffer_pool_size=128M
     networks:
       - gost-network
     healthcheck:
@@ -36,7 +36,7 @@ services:
       DB_PASSWORD: ${DB_PASSWORD}
       JWT_SECRET: ${JWT_SECRET}
       LOG_DIR: /app/logs
-      JAVA_OPTS: "-Xms256m -Xmx512m -Dfile.encoding=UTF-8 -Duser.timezone=Asia/Shanghai"
+      JAVA_OPTS: "-Xms96m -Xmx256m -Dfile.encoding=UTF-8 -Duser.timezone=Asia/Shanghai -XX:MaxMetaspaceSize=128m"
     ports:
       - "${BACKEND_PORT}:6365"
     volumes:
